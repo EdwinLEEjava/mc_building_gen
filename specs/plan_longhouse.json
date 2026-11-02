@@ -1,0 +1,12 @@
+{
+ "palette": "taiga_cabin",
+ "width": 11,
+ "depth": 9,
+ "floors": 1,
+ "floor_height": 5,
+ "jetty": false,
+ "roof_pitch": "normal",
+ "plan": "longhouse",
+ "seed": 3,
+ "annexes": []
+}

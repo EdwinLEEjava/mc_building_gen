@@ -1,0 +1,14 @@
+{
+ "palette": "taiga_cabin",
+ "width": 11,
+ "depth": 11,
+ "floors": 1,
+ "floor_height": 5,
+ "jetty": false,
+ "roof_pitch": "normal",
+ "flared_eave": true,
+ "chimney": true,
+ "seed": 3,
+ "plan": "rect",
+ "annexes": []
+}

@@ -1,0 +1,14 @@
+# 历史备份、缓存、生成物
+_backup/
+__pycache__/
+*.pyc
+out/
+dist/
+# 体积大、可由 make_specs.py / py_run.py 重新生成
+web/test/py.json
+# 游戏素材和视频不进仓库（纹理由使用者在浏览器里自行载入）
+*.mp4
+*.mov
+*.jar
+*.mcpack
+resourcepacks/

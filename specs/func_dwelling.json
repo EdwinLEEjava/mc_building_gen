@@ -1,0 +1,18 @@
+{
+ "palette": "medieval_timber",
+ "width": 15,
+ "depth": 9,
+ "floors": 2,
+ "floor_height": 4,
+ "jetty": false,
+ "roof_pitch": "normal",
+ "chimney": true,
+ "annexes": [
+  "porch",
+  "oriel",
+  "storage"
+ ],
+ "function": "dwelling",
+ "plan": "rect",
+ "seed": 6
+}

@@ -1,0 +1,14 @@
+{
+ "palette": "oak_cottage",
+ "width": 15,
+ "depth": 9,
+ "floors": 1,
+ "floor_height": 5,
+ "jetty": false,
+ "roof_pitch": "normal",
+ "chimney": true,
+ "annexes": "auto",
+ "function": "farm",
+ "plan": "L",
+ "seed": 2
+}

@@ -1,0 +1,13 @@
+{
+ "palette": "oak_cottage",
+ "width": 15,
+ "depth": 11,
+ "floors": 1,
+ "floor_height": 5,
+ "jetty": false,
+ "roof_style": "gambrel",
+ "chimney": false,
+ "seed": 21,
+ "plan": "rect",
+ "annexes": []
+}

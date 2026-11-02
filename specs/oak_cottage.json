@@ -1,0 +1,13 @@
+{
+ "palette": "oak_cottage",
+ "width": 17,
+ "depth": 9,
+ "floors": 2,
+ "floor_height": 4,
+ "jetty": true,
+ "roof_pitch": "low",
+ "chimney": false,
+ "seed": 11,
+ "plan": "rect",
+ "annexes": []
+}

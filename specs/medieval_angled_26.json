@@ -1,0 +1,14 @@
+{
+ "palette": "medieval_timber",
+ "width": 15,
+ "depth": 11,
+ "floors": 2,
+ "floor_height": 4,
+ "jetty": true,
+ "roof_pitch": "normal",
+ "chimney": true,
+ "seed": 7,
+ "rotation": 26,
+ "plan": "rect",
+ "annexes": []
+}

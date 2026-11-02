@@ -1,0 +1,20 @@
+{
+ "palette": "medieval_timber",
+ "width": 15,
+ "depth": 11,
+ "floors": 2,
+ "floor_height": 4,
+ "jetty": true,
+ "roof_pitch": "normal",
+ "chimney": true,
+ "seed": 9,
+ "plan": "rect",
+ "annexes": [],
+ "colors": {
+  "roof": "深灰",
+  "wall": "米黄",
+  "wall_ground": "砖红",
+  "frame": "浅棕",
+  "base": "深灰"
+ }
+}
