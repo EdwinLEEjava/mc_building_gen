@@ -1,5 +1,11 @@
 const M = require('../mcgen.js'); M.initData(require('../mcgen_data.json'));
 const specs = require('./specs.json'), py = require('./py.json');
+// Invalid floor inputs must fail instead of producing a roof-only "zero-storey" house.
+const assert = require('node:assert/strict');
+for (const floors of [0, -1, 1.5, null, false, '2']) {
+  assert.throws(() => M.generate({ floors }), /层数必须为大于 0 的整数/);
+}
+
 let ok = 0, bad = 0; const t0 = Date.now(); const fails = [];
 specs.forEach((sp, i) => {
   let r;

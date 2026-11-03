@@ -79,6 +79,8 @@ def _violation(m, rules):
 def solve(spec):
     """Return (adjusted_spec, report_lines, metrics)."""
     s = {**DEFAULT_SPEC, **spec}
+    if type(s["floors"]) is not int or s["floors"] < 1:
+        raise ValueError("层数必须为大于 0 的整数。")
     rules = dict(STYLE_RULES.get(s["palette"], DEFAULT_RULES))
     style = s.get("roof_style", "gable")
     if style in ROOF_STYLE_BAND:

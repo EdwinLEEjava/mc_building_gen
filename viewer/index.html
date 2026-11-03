@@ -2556,6 +2556,7 @@ function violation(m, rules) {
 }
 function solve(spec) {
   const s = { ...DEFAULT_SPEC, ...spec };
+  if (!Number.isInteger(s.floors) || s.floors < 1) throw new Error("层数必须为大于 0 的整数。");
   const rules = { ...(STYLE_RULES[s.palette] || DEFAULT_RULES) };
   const style = s.roof_style !== undefined ? s.roof_style : 'gable';
   if (style in ROOF_STYLE_BAND) {
