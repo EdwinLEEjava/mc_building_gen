@@ -1,0 +1,5 @@
+#!/bin/sh
+# Rebuild the generated files after the working tree changed (see scripts/setup-hooks.*). Never blocks git.
+root="$(git rev-parse --show-toplevel)" || exit 0
+sh "$root/scripts/build.sh" >/dev/null 2>&1 || echo "mcgen: 自动生成失败，请手动运行 scripts/build.bat（或 scripts/build.sh）" >&2
+exit 0

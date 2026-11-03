@@ -15,13 +15,26 @@
 - **方块纹理**：侧栏"方块纹理"可以载入游戏 jar（`.minecraft/versions/版本/版本.jar`）、资源包 zip 或解压后的 `textures` 文件夹，预览就用真实纹理；纹理只存在使用者自己的浏览器里（IndexedDB），页面本身不含任何游戏素材，可以放心分发。
 - 页面里点"导出 .schem"直接下载文件（在 claude.ai 的预览页里会打包成 .zip）。
 
+## 生成的文件不进仓库（拉代码后先生成一次）
+
+`viewer/index.html`、`web/mcgen.js`、`web/mcgen_data.json` 都是从源码生成的，**不再提交到 git**——以前每个分支都会改它们，
+合并时必然冲突。现在：
+
+- **第一次**：运行一次 `scripts\setup-hooks.bat`（macOS / Linux：`sh scripts/setup-hooks.sh`）。它会生成一次页面，
+  并让以后每次 `git pull`、切换分支、合并之后自动重新生成，什么都不用管。
+- **不想用自动生成**：拉代码后双击 `scripts\build.bat`（或运行 `python build_viewer.py`）。
+- **直接用最新版**：main 上每次合并后，GitHub Actions 会自动生成并发布到 GitHub Pages：
+  https://edwinlee-371.github.io/mc_building_gen/ ；每个 PR 的检查结果里也能下载 `mcgen-viewer`（生成好的页面）。
+- **新增源码文件**：`web/src/` 下新加的 `.js` 会被自动打包、顶层的函数和常量自动导出，不用改 `web/build_js.py`。
+  只有当新文件的顶层代码在载入时就要用到别的文件的常量，才需要把它写进 `ORDER`。
+
 ## 开发
 
 生成器的主实现是 `web/src/*.js`（从 Python 版逐行移植，同一个种子生成的房子逐格相同）：
 
 ```bash
-python web/build_js.py                          # web/src/*.js -> web/mcgen.js，导出色板数据 web/mcgen_data.json
-python build_viewer.py                          # 生成示例并把 mcgen.js + 数据打包进 viewer/index.html
+python build_viewer.py                          # 一条命令全部生成：web/mcgen.js、web/mcgen_data.json、viewer/index.html
+python web/build_js.py                          # 只生成 web/mcgen.js 与 web/mcgen_data.json（Node 与测试用）
 node web/cli.js specs/plan_L.json out/L.schem   # 命令行生成 .schem（Node.js，无依赖）
 ```
 
