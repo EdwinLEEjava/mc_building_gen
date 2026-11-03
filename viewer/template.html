@@ -568,6 +568,10 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
         <label class="ck"><input type="checkbox" id="c_cd_statues" checked>雕像（壁龛、扶壁、门侧）</label>
         <label class="f">门洞层数（最多）<input type="number" id="c_cd_portal_orders" min="1" max="6" value="6"></label>
         <label class="ck"><input type="checkbox" id="c_cd_flying_buttresses" checked>飞扶壁</label>
+        <label class="f">飞扶壁层数<select id="c_cd_flyer_levels"><option value="1" selected>单层</option><option value="2">双层（科隆 / 巴黎）</option></select></label>
+        <label class="ck"><input type="checkbox" id="c_cd_gargoyles" checked>滴水兽（飞扶壁墩上）</label>
+        <label class="ck"><input type="checkbox" id="c_cd_louvers" checked>钟楼窗百叶 + 钟</label>
+        <label class="ck"><input type="checkbox" id="c_cd_dormers">屋面老虎窗</label>
         <label class="ck"><input type="checkbox" id="c_cd_pinnacles" checked>小尖塔</label>
         <label class="ck"><input type="checkbox" id="c_cd_fleche" checked>交叉处尖塔</label>
         <label class="f">交叉处尖塔高<input type="number" id="c_cd_fleche_height" min="10" max="90" value="50"></label>
@@ -2825,7 +2829,7 @@ const PANEL_GROUPS = {
     ['平面', ['c_cd_nave_bays', 'c_cd_bay', 'c_cd_width', 'c_cd_aisles', 'c_cd_aisle_width', 'c_cd_transept', 'c_cd_transept_depth', 'c_cd_choir_bays', 'c_cd_east_end', 'c_cd_chapels', 'c_cd_chapel_depth']],
     ['剖面高度', ['c_cd_arcade_height', 'c_cd_gallery_height', 'c_cd_clerestory_height', 'c_cd_roof_pitch']],
     ['西立面与塔', ['c_cd_facade', 'c_cd_tower_top', 'c_cd_crossing', 'c_cd_portal_orders', 'c_cd_statues', 'c_cd_facade_extra', 'c_cd_tower_rise', 'c_cd_rose', 'c_cd_kings', 'c_cd_fleche', 'c_cd_fleche_height']],
-    ['结构与装饰', ['c_cd_flying_buttresses', 'c_cd_pinnacles', 'c_cd_pinnacle_forest', 'c_cd_roof_style']],
+    ['结构与装饰', ['c_cd_flying_buttresses', 'c_cd_flyer_levels', 'c_cd_gargoyles', 'c_cd_louvers', 'c_cd_dormers', 'c_cd_pinnacles', 'c_cd_pinnacle_forest', 'c_cd_roof_style']],
     ['附属', ['c_cd_campanile', 'c_cd_court']],
     ['材质预设', ['c_cd_walls', 'c_cd_roof', 'c_cd_glass']], ['室内', ['c_cd_interior']]],
   green: [['基本', ['c_gr_swatch', 'c_gr_preview', 'c_gr_density', 'c_gr_seed']], ['体积与尺寸', ['c_gr_width', 'c_gr_length']],
@@ -2843,6 +2847,8 @@ const PANEL_DEPS = {
   c_ch_tower_section: () => !['bellcote', 'none'].includes(val('c_ch_tower')), c_ch_tower_top: () => !['bellcote', 'none'].includes(val('c_ch_tower')),
   c_ch_tower_storeys: () => !['bellcote', 'none'].includes(val('c_ch_tower')), c_ch_spire_height: () => !['bellcote', 'none'].includes(val('c_ch_tower')) && val('c_ch_tower_top') === 'spire',
   c_cd_transept_depth: () => val('c_cd_transept'), c_cd_fleche: () => val('c_cd_transept'), c_cd_fleche_height: () => val('c_cd_transept') && val('c_cd_fleche'),
+  c_cd_flyer_levels: () => val('c_cd_flying_buttresses') && val('c_cd_facade') !== 'simple', c_cd_gargoyles: () => val('c_cd_flying_buttresses') && val('c_cd_facade') !== 'simple',
+  c_cd_louvers: () => val('c_cd_facade') === 'detailed' && val('c_cd_tower_top') !== 'none', c_cd_dormers: () => val('c_cd_roof_style') === 'pitched',
   c_cd_chapels: () => val('c_cd_east_end') === 'chevet', c_cd_chapel_depth: () => val('c_cd_east_end') === 'chevet' && +val('c_cd_chapels') > 0,
   c_mn_ribbons: () => val('c_mn_kind') === 'maypole',
   c_plaza_tree_layout: () => +val('c_plaza_trees') > 0, c_plaza_tree_species: () => +val('c_plaza_trees') > 0, c_plaza_tree_size: () => +val('c_plaza_trees') > 0, c_plaza_tree_spacing: () => +val('c_plaza_trees') > 0, c_plaza_planter: () => +val('c_plaza_trees') > 0,
@@ -2971,8 +2977,8 @@ function compSpec() {
   if (ctype === 'cathedral') {
     const o = { type: 'cathedral' };
     for (const k of ['style', 'facade', 'tower_top', 'crossing', 'roof_style', 'east_end', 'roof_pitch', 'walls', 'roof', 'glass']) o[k] = val('c_cd_' + k);
-    for (const k of ['nave_bays', 'bay', 'width', 'aisles', 'aisle_width', 'transept_depth', 'choir_bays', 'chapels', 'chapel_depth', 'arcade_height', 'gallery_height', 'clerestory_height', 'facade_extra', 'tower_rise', 'fleche_height', 'portal_orders', 'seed']) o[k] = +val('c_cd_' + k);
-    for (const k of ['transept', 'rose', 'kings', 'statues', 'pinnacle_forest', 'campanile', 'court', 'flying_buttresses', 'pinnacles', 'fleche', 'interior']) o[k] = val('c_cd_' + k);
+    for (const k of ['nave_bays', 'bay', 'width', 'aisles', 'aisle_width', 'transept_depth', 'choir_bays', 'chapels', 'chapel_depth', 'arcade_height', 'gallery_height', 'clerestory_height', 'facade_extra', 'tower_rise', 'fleche_height', 'portal_orders', 'flyer_levels', 'seed']) o[k] = +val('c_cd_' + k);
+    for (const k of ['transept', 'rose', 'kings', 'statues', 'pinnacle_forest', 'campanile', 'court', 'flying_buttresses', 'gargoyles', 'louvers', 'dormers', 'pinnacles', 'fleche', 'interior']) o[k] = val('c_cd_' + k);
     const mats = readMats('cathedral'); if (mats) o.mats = mats;
     return o;
   }
