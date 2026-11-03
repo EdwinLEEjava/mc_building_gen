@@ -13,11 +13,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ORDER = [
     "py.js",
     "core.js",
+    "version.js",
     "house.js",
     "layout.js",
     "api.js",
     "terrain.js",
     "props.js",
+    "green.js",
     "stall.js",
     "fountain.js",
     "monument.js",

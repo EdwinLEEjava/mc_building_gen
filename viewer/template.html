@@ -87,6 +87,27 @@ canvas:active { cursor: grabbing; }
 .matbox .mctl input[type=color] { width: 34px; height: 24px; padding: 0; border: 0; background: none; }
 .matbox .sw { width: 12px; height: 12px; border-radius: 2px; display: inline-block; border: 1px solid #0006; }
 .matbox .mnote { font-size: 11.5px; color: var(--muted); margin: 0 0 4px; }
+.gmix { display: flex; flex-direction: column; gap: 3px; }
+.gmix .gmrow { display: grid; grid-template-columns: 1fr 58px 40px 22px; gap: 4px; align-items: center; }
+.gmix .gmrow .pct { font-size: 11px; color: var(--muted); text-align: right; }
+.gmix .gmrow button, .gmix .gmadd { all: unset; cursor: pointer; color: var(--muted); font-size: 12px; text-align: center; }
+.gmix .gmrow button:hover, .gmix .gmadd:hover { color: var(--accent); }
+.gmix .gmadd { text-align: left; padding: 2px 0; }
+.gmix .gver { grid-column: 1 / -1; font-size: 11px; color: #d9a35a; margin-top: -2px; }
+.gsave { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; } .gsave input[type=text] { flex: 1 1 120px; }
+.ghint { font-size: 11.5px; color: var(--muted); }
+.gpop { position: fixed; z-index: 30; background: #1b1f26; border: 1px solid var(--line); border-radius: 7px; padding: 10px 12px; width: 360px; box-shadow: 0 8px 24px #0008; font-size: 12px; color: var(--muted); }
+.gpop .gpgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+.gpop label { display: flex; flex-direction: column; gap: 2px; } .gpop label.ck { flex-direction: row; align-items: center; grid-column: 1 / -1; gap: 6px; color: var(--text); }
+.gpop input[type=number], .gpop select, .gpop input[type=text] { background: #14171c; color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 3px 5px; font: 12px var(--font-body); }
+.gpop .gpsave { display: flex; gap: 4px; margin-top: 8px; align-items: center; } .gpop .gpsave input { flex: 1; min-width: 0; } .gpop .gpsave .btn { padding: 4px 8px; font-size: 12px; white-space: nowrap; }
+.glayers { display: flex; flex-direction: column; gap: 6px; }
+.glayer { border: 1px solid var(--line); border-radius: 5px; padding: 6px; display: grid; grid-template-columns: auto 1fr auto; gap: 5px 6px; align-items: center; font-size: 12px; }
+.glayer.on { border-color: var(--accent); }
+.glayer .gl2 { grid-column: 1 / -1; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.glayer .gl2 select { flex: 1 1 110px; } .glayer .gl2 input[type=number] { width: 70px; flex: 0 0 70px; }
+.glayer button { all: unset; cursor: pointer; color: var(--muted); padding: 0 3px; } .glayer button:hover { color: var(--accent); }
+.glayer input[type=text] { background: transparent; border: 0; color: var(--text); font: 12.5px var(--font-body); width: 100%; }
 .gen .ck { display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--text); }
 .gen .ck input { accent-color: var(--accent); }
 .gen .seedrow { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
@@ -314,13 +335,31 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
       <label class="ofield" data-only="brush"><input type="checkbox" id="o_autogen" checked>松开后自动生成</label>
       <button type="button" class="obtn" data-act="undo" data-only="point">撤销一点 <kbd>Ctrl+Z</kbd></button><button type="button" class="obtn" data-act="clear">清空路线</button></div>
     <div class="og" data-for="drag"><b class="otool">拖拽道路</b><span class="ohint">拖动路线上的圆点移动它；拖动两点之间的小点插入新点；Alt+点击或右键点击删除一点。拖动时道路范围实时跟随，松开后重新生成</span></div>
-    <div class="og" data-for="marquee"><b class="otool">选区</b><span class="oseg" id="o_shape"><button type="button" data-shape="rect" aria-pressed="true" title="矩形：拖出矩形">矩形</button><button type="button" data-shape="ellipse" title="椭圆：拖出椭圆">椭圆</button><button type="button" data-shape="lasso" title="自由套索：按住左键画出边界，松开自动闭合">套索</button><button type="button" data-shape="poly" title="多边形套索：逐点单击，双击 / Enter / 点回起点闭合，Backspace 删上一点">多边形</button><button type="button" data-shape="magnetic" title="磁性套索：单击起点后沿边界移动，自动吸附到坡坎、水岸和路边；单击加锚点，双击 / Enter 闭合">磁性</button></span><label class="ofield">方式<select id="o_selop"><option value="new" selected>新选区</option><option value="add">添加（Ctrl）</option><option value="sub">减去（Alt）</option><option value="and">交叉（Ctrl+Alt）</option></select></label><label class="ofield">用途<select id="o_zone"><option value="district" selected>自动生成布局</option><option value="plaza">广场</option><option value="reserve">保留空地（不自动建）</option><option value="range">生成范围</option></select></label><button type="button" class="obtn" data-act="selApply">应用 <kbd>Enter</kbd></button><button type="button" class="obtn" data-act="selCancel">取消选区 <kbd>Esc</kbd></button><span id="slot-useregion"></span><button type="button" class="obtn" data-act="clearRegion">清空生成范围</button><span class="ohint" id="o_selhint">画好选区后按"应用"</span></div>
+    <div class="og" data-for="green"><b class="otool">绿化</b><label class="ofield">笔刷<select id="o_gpreset"></select></label><label class="ofield">绿化颜色<select id="o_gcolor"></select></label><label class="ofield">大小<input type="number" id="o_gsize" min="1" max="64" value="8" style="width:46px"></label><label class="ofield">硬度 %<input type="number" id="o_ghard" min="0" max="100" step="10" value="50" style="width:46px"></label><label class="ofield" title="一笔最多画到多浓">不透明 %<input type="number" id="o_gop" min="5" max="100" step="5" value="100" style="width:46px"></label><label class="ofield" title="每落一笔加多少；低流量要来回涂几遍才浓">流量 %<input type="number" id="o_gflow" min="1" max="100" step="5" value="100" style="width:46px"></label><button type="button" class="obtn" id="o_gmore" title="间距、散布、数量、抖动、喷溅团块……">笔刷设置 ▾</button><label class="ofield" data-gonly="erase thin">擦<select id="o_gerase"><option value="all" selected>所有图层</option><option value="one">当前图层</option></select></label><button type="button" class="obtn" id="o_gfill" title="用当前绿化颜色填满选区工具（M）画好的选区">填满选区</button><span class="ohint" id="o_ghint">按住左键在地面上画；[ ] 改大小</span></div>
+    <div class="gpop" id="gpop" hidden>
+      <div class="gpgrid">
+        <label>间距 %<input type="number" id="gp_spacing" min="5" max="1000" step="5" title="两次落笔的距离，按笔刷直径的百分比"></label>
+        <label>大小抖动 %<input type="number" id="gp_sizeJ" min="0" max="100" step="5" title="每一笔随机变小多少"></label>
+        <label>散布 %<input type="number" id="gp_scatter" min="0" max="1000" step="10" title="落笔点偏离笔迹多远，按直径的百分比"></label>
+        <label class="ck"><input type="checkbox" id="gp_both">两轴散布（也沿笔迹方向）</label>
+        <label>数量<input type="number" id="gp_count" min="1" max="16" title="每一步落几笔"></label>
+        <label>数量抖动 %<input type="number" id="gp_countJ" min="0" max="100" step="10"></label>
+        <label>笔尖<select id="gp_tip"><option value="round">圆形</option><option value="splat">喷溅团块（不规则）</option></select></label>
+        <label>团块碎度<input type="number" id="gp_rough" min="0" max="100" step="10" title="喷溅团块边缘有多碎"></label>
+        <label class="ck"><input type="checkbox" id="gp_air">喷枪：按住不动也会越来越浓</label>
+        <label>沿线间隔（格）<input type="number" id="gp_gap" min="2" max="40" title="沿线笔刷：每隔多少格落一笔"></label>
+        <label>沿线两侧偏移（格）<input type="number" id="gp_offset" min="0" max="20" title="0 = 落在笔迹上；大于 0 = 笔迹两侧各一排（行道树）"></label>
+      </div>
+      <div class="gpsave"><input type="text" id="gp_name" placeholder="笔刷名字" maxlength="16"><button type="button" class="btn ghost" id="gp_save">保存为笔刷预设</button><button type="button" class="btn ghost" id="gp_del">删除</button></div>
+      <small class="ghint" id="gp_hint"></small>
+    </div>
+    <div class="og" data-for="marquee"><b class="otool">选区</b><span class="oseg" id="o_shape"><button type="button" data-shape="rect" aria-pressed="true" title="矩形：拖出矩形">矩形</button><button type="button" data-shape="ellipse" title="椭圆：拖出椭圆">椭圆</button><button type="button" data-shape="lasso" title="自由套索：按住左键画出边界，松开自动闭合">套索</button><button type="button" data-shape="poly" title="多边形套索：逐点单击，双击 / Enter / 点回起点闭合，Backspace 删上一点">多边形</button><button type="button" data-shape="magnetic" title="磁性套索：单击起点后沿边界移动，自动吸附到坡坎、水岸和路边；单击加锚点，双击 / Enter 闭合">磁性</button></span><label class="ofield">方式<select id="o_selop"><option value="new" selected>新选区</option><option value="add">添加（Ctrl）</option><option value="sub">减去（Alt）</option><option value="and">交叉（Ctrl+Alt）</option></select></label><label class="ofield">用途<select id="o_zone"><option value="district" selected>自动生成布局</option><option value="plaza">广场</option><option value="reserve">保留空地（不自动建）</option><option value="green">绿化（用绿化笔刷当前的颜色填满）</option><option value="range">生成范围</option></select></label><button type="button" class="obtn" data-act="selApply">应用 <kbd>Enter</kbd></button><button type="button" class="obtn" data-act="selCancel">取消选区 <kbd>Esc</kbd></button><span id="slot-useregion"></span><button type="button" class="obtn" data-act="clearRegion">清空生成范围</button><span class="ohint" id="o_selhint">画好选区后按"应用"</span></div>
     <div class="og-right"><span id="slot-viewbtns"></span><button type="button" class="obtn" id="layerbtn" title="剖切高度：看建筑内部">剖切 <b id="layerbv"></b> ▾</button><div id="layerpop" hidden><span id="slot-layer"></span></div></div>
   </div>
   <nav class="toolbar" id="toolbar" aria-label="工具">
     <button type="button" class="tool" data-tool="select" title="选择 / 移动（V）" aria-label="选择 / 移动"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l13 8-6 1.5L9 19z"/></svg><kbd>V</kbd></button><button type="button" class="tool" data-tool="view" title="旋转视角（R）" aria-label="旋转视角"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8" /><path d="M20 4v5h-5" /></svg><kbd>R</kbd></button><button type="button" class="tool" data-tool="pan" title="平移（H）" aria-label="平移"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18" /><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" /></svg><kbd>H</kbd></button>
     <i class="tsep"></i>
-    <button type="button" class="tool" data-tool="point" title="画路（P 点选 / B 连续）" aria-label="画路"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18c3 0 4-2 5-4s3-6 6-7 5 1 5 1" /><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="8" r="1.6"/></svg><kbd>P</kbd></button><button type="button" class="tool" data-tool="drag" title="拖拽道路（D）" aria-label="拖拽道路"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17c4 0 5-6 9-6s4 4 7 4" /><circle cx="13" cy="11" r="2.6"/><path d="M13 4v3M13 15v3M6 11h3M17 11h3" /></svg><kbd>D</kbd></button><button type="button" class="tool" data-tool="marquee" title="选框（M）" aria-label="选框"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1" stroke-dasharray="3 2.5"/></svg><kbd>M</kbd></button>
+    <button type="button" class="tool" data-tool="point" title="画路（P 点选 / B 连续）" aria-label="画路"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18c3 0 4-2 5-4s3-6 6-7 5 1 5 1" /><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="8" r="1.6"/></svg><kbd>P</kbd></button><button type="button" class="tool" data-tool="drag" title="拖拽道路（D）" aria-label="拖拽道路"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17c4 0 5-6 9-6s4 4 7 4" /><circle cx="13" cy="11" r="2.6"/><path d="M13 4v3M13 15v3M6 11h3M17 11h3" /></svg><kbd>D</kbd></button><button type="button" class="tool" data-tool="marquee" title="选框（M）" aria-label="选框"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1" stroke-dasharray="3 2.5"/></svg><kbd>M</kbd></button><button type="button" class="tool" data-tool="green" title="绿化笔刷（J）" aria-label="绿化笔刷"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z"/><path d="M5 19l7-7"/></svg><kbd>J</kbd></button>
   </nav>
   <aside id="src" hidden>
     <div>
@@ -365,6 +404,7 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
         <button type="button" class="cat" data-cat="landmark" aria-selected="false">地标</button>
         <button type="button" class="cat" data-cat="deco" aria-selected="false">装饰物</button>
         <button type="button" class="cat" data-cat="plaza" aria-selected="false">广场</button>
+        <button type="button" class="cat" data-cat="green" aria-selected="false">绿化</button>
       </div>
       <div class="types" role="tablist" aria-label="组件类型" hidden>
         <button type="button" class="type" data-cat="house" data-type="house" aria-selected="true">房屋</button>
@@ -376,6 +416,7 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
         <button type="button" class="type" data-cat="deco" data-type="tree" aria-selected="false">树</button>
         <button type="button" class="type" data-cat="deco" data-type="well" aria-selected="false">井</button>
         <button type="button" class="type" data-cat="deco" data-type="stall" aria-selected="false">摊位</button>
+        <button type="button" class="type" data-cat="green" data-type="green" aria-selected="false">绿化配方</button>
         <button type="button" class="type" data-cat="plaza" data-type="plaza" aria-selected="false">广场</button>
       </div>
     <div class="sec gen ctype" id="gen" data-ctype="house">
@@ -599,6 +640,40 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
         <label class="f full">种子<input type="number" id="c_plaza_seed" value="1"></label>
       </div>
     </div>
+    <div class="sec gen ctype" data-ctype="green" hidden>
+      <span class="sec-title">绿化 · 绿化配方</span>
+      <p class="spec-note">配方 = 地面、地被、花、灌木、树按比例混在一起。调好后“保存为绿化颜色”，在布局模式里用绿化笔刷画到地上。下面预览的是一块地按这个配方长出来的样子；“浓度”就是笔刷画得多浓。</p>
+      <div class="grid">
+        <label class="f full">绿化颜色（色板）<select id="c_gr_swatch"></select></label>
+        <label class="f">预览的浓度分布<select id="c_gr_preview"></select></label>
+        <label class="f">浓度 %<input type="number" id="c_gr_density" min="0" max="100" step="10" value="100"></label>
+        <label class="f">宽<input type="number" id="c_gr_width" min="4" max="96" value="24"></label>
+        <label class="f">长<input type="number" id="c_gr_length" min="4" max="96" value="24"></label>
+        <label class="f full">地面方块（比例）<input type="hidden" id="c_gr_ground"><div class="gmix" data-for="c_gr_ground" data-opts="GREEN_GROUND"></div></label>
+        <label class="f">成片程度（0 = 逐格随机）<input type="number" id="c_gr_ground_patch" min="0" max="24" value="5"></label>
+        <label class="f">地被覆盖 %<input type="number" id="c_gr_cover_amount" min="0" max="100" value="50"></label>
+        <label class="f full">地被种类（比例）<input type="hidden" id="c_gr_cover"><div class="gmix" data-for="c_gr_cover" data-opts="GREEN_COVER"></div></label>
+        <label class="f">花覆盖 %<input type="number" id="c_gr_flowers_amount" min="0" max="100" value="12"></label>
+        <label class="f">成丛程度 %<input type="number" id="c_gr_flowers_clump" min="0" max="100" step="10" value="50"></label>
+        <label class="f">浓度到多少才开花 %<input type="number" id="c_gr_from_flowers" min="0" max="100" step="5" value="20"></label>
+        <label class="f full">花的种类（比例）<input type="hidden" id="c_gr_flowers"><div class="gmix" data-for="c_gr_flowers" data-opts="GREEN_FLOWERS"></div></label>
+        <label class="f">灌木：每 100 格几丛<input type="number" id="c_gr_shrubs_amount" min="0" max="50" step="0.5" value="0"></label>
+        <label class="f">灌木最小间距<input type="number" id="c_gr_shrubs_spacing" min="1" max="12" value="3"></label>
+        <label class="f">灌木大小<select id="c_gr_shrubs_size"></select></label>
+        <label class="f">浓度到多少才有灌木 %<input type="number" id="c_gr_from_shrubs" min="0" max="100" step="5" value="40"></label>
+        <label class="f full">灌木种类（比例）<input type="hidden" id="c_gr_shrubs"><div class="gmix" data-for="c_gr_shrubs" data-opts="GREEN_SHRUBS"></div></label>
+        <label class="f">树：每 100 格几棵<input type="number" id="c_gr_trees_amount" min="0" max="50" step="0.5" value="0"></label>
+        <label class="f">树最小间距<input type="number" id="c_gr_trees_spacing" min="1" max="20" value="6"></label>
+        <label class="f">浓度到多少才有树 %<input type="number" id="c_gr_from_trees" min="0" max="100" step="5" value="50"></label>
+        <label class="f full">树的种类（比例）<input type="hidden" id="c_gr_trees"><div class="gmix" data-for="c_gr_trees" data-opts="GREEN_TREES"></div></label>
+        <label class="f">边缘<select id="c_gr_edge_kind"></select></label>
+        <label class="f">树篱叶子<select id="c_gr_edge_block"></select></label>
+        <label class="f">镶边方块<select id="c_gr_edge_border"></select></label>
+        <label class="f">树篱高<input type="number" id="c_gr_edge_height" min="1" max="4" value="2"></label>
+        <label class="f full">种子<input type="number" id="c_gr_seed" value="1"></label>
+        <label class="f full">保存为绿化颜色<span class="gsave"><input type="text" id="c_gr_name" placeholder="给这个配方起个名字" maxlength="24"><button type="button" class="btn ghost" id="c_gr_save">保存</button><button type="button" class="btn ghost" id="c_gr_del" title="删除选中的自定义绿化颜色（内置的不能删）">删除</button><button type="button" class="btn ghost" id="c_gr_export" title="把你保存的绿化颜色导出成文件">导出</button><button type="button" class="btn ghost" id="c_gr_import" title="导入别人导出的绿化颜色">导入</button><input type="file" id="c_gr_file" accept=".json,.zip" hidden></span><small class="ghint" id="c_gr_hint"></small></label>
+      </div>
+    </div>
     <div class="actions comp-actions"><button class="btn" type="button" id="c_run" hidden>生成</button><span class="status" id="c_status"></span></div>
     </div>
 
@@ -679,6 +754,11 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
       <p class="spec-note" id="t_pickinfo">按"框选区域"后在地形上点两下，定出矩形的两个对角。</p>
       <div class="status" id="t_status" role="status"></div>
     </div>
+    <div class="sec gen" id="greensec">
+      <span class="sec-title">绿化图层</span>
+      <p class="spec-note">用左边的绿化笔刷（J）选一个“绿化颜色”在地面上画，每种颜色一个图层，后画的颜色会替换先画的。改图层的配方或种子，画过的地方一起变。绿化不会长在道路、房屋、广场和水面上。新的绿化颜色在组件模式 → 绿化 → 绿化配方里调好后保存。</p>
+      <div id="g_layers" class="glayers"></div>
+    </div>
 
     </div>
 
@@ -728,6 +808,8 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
         <div><b id="cnt">–</b><span>方块数</span></div>
         <div><b id="kinds">–</b><span>方块种类</span></div>
       </div>
+      <label class="f" title="导出的 .schem 能放进哪个版本的游戏。比它新的方块会换成最接近的旧方块，预览也跟着换；工程里保存的仍是原来的方块">目标游戏版本<select id="gver"></select></label>
+      <div class="ohint" id="gverhint"></div>
       <div class="actions exp"><button class="btn" type="button" id="exp">导出 .schem</button></div>
       <div class="status" id="expst" role="status"></div>
     </div>
@@ -1577,7 +1659,7 @@ async function usePack(label, files, remember) {
     const names = new Set();
     const add = n => { if (typeof n === 'string' && texHas(n)) names.add(n); };
     for (const state of model.palette) {
-      const def = resolveDef(state);
+      const def = resolveDefV(state);
       for (const key of ['top', 'side', 'bottom', 'end', 'front', 'cross']) add(def.tx && def.tx[key]);
       for (const box of def.uvb || []) {
         for (const n of typeof box.tex === 'string' ? [box.tex] : Object.values(box.tex || {})) add(texHas(n) ? n : box.alt);
@@ -1603,13 +1685,29 @@ async function loadPackFrom(kind, input) {
 // ====================== Mesher ======================
 // shared per-model data for meshing (block defs, opacity grid); chunks reuse it
 let MCTX = null;
+// ---- target game version (version.js): the preview and the export show the swapped blocks ----
+var GVER = MCGen.GAME_VERSION_DEFAULT; try { const v = localStorage.getItem('mcgen.gver'); if (v && MCGen.GAME_VERSIONS.some(g => g.id === v)) GVER = v; } catch (e) {}
+const resolveDefV = s => resolveDef(GVER === MCGen.GAME_VERSION_DEFAULT ? s : MCGen.verState(s, GVER));
+function gverSummary(m) {
+  if (!m || GVER === MCGen.GAME_VERSION_DEFAULT) return '';
+  const rep = MCGen.verReport(m.palette, m.data, GVER), lab = MCGen.GAME_VERSIONS.find(g => g.id === GVER).label;
+  if (!rep.length) return `按 ${lab} 导出：没有需要替换的方块。`;
+  return `按 ${lab} 显示和导出，替换了 ${rep.length} 种方块：` + rep.slice(0, 6).map(([a, b, n]) => `${a} → ${b || '去掉'}（${n}）`).join('，') + (rep.length > 6 ? ' 等' : '') + '。';
+}
+function gverHint() { const el = document.getElementById('gverhint'); if (el) el.textContent = gverSummary(model); }
+function setGver(v) {
+  GVER = MCGen.GAME_VERSIONS.some(g => g.id === v) ? v : MCGen.GAME_VERSION_DEFAULT;
+  try { localStorage.setItem('mcgen.gver', GVER); } catch (e) {}
+  const sel = document.getElementById('gver'); if (sel && sel.value !== GVER) sel.value = GVER;
+  MCTX = null; if (model) rebuild(); gverHint(); if (typeof greenMixRefresh === 'function') greenMixRefresh();
+}
 function meshCtx(model) {
-  if (MCTX && MCTX.model === model && MCTX.n === model.palette.length && MCTX.tex === TEX.glTex) return MCTX;
+  if (MCTX && MCTX.model === model && MCTX.n === model.palette.length && MCTX.tex === TEX.glTex && MCTX.ver === GVER) return MCTX;
   const { W, H, L, palette, data } = model;
-  const defs = palette.map(s => resolveDef(s || 'minecraft:air'));
+  const defs = palette.map(s => resolveDefV(s || 'minecraft:air'));
   const opaque = new Uint8Array(W * H * L);
   for (let i = 0; i < data.length; i++) { const d = defs[data[i]]; if (d && d.full && !d.transparent && !d.skip) opaque[i] = 1; }
-  return MCTX = { model, defs, opaque, n: palette.length, tex: TEX.glTex };
+  return MCTX = { model, defs, opaque, n: palette.length, tex: TEX.glTex, ver: GVER };
 }
 function buildMesh(model, cutY, rect, overlayOnly) {
   const { W, H, L, palette, data } = model;
@@ -1948,10 +2046,12 @@ canvas.addEventListener('pointerdown', e => {
   if (TOOL === 'select' && e.button === 0 && !e.shiftKey && !e.altKey && !ptrs.size && ((!(e.ctrlKey || e.metaKey) && gizDown(e)) || selDown(e))) return;
   if (TOOL === 'select' && e.button === 0 && !e.shiftKey && !e.altKey && !ptrs.size && townActive()) { bsel = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, add: e.ctrlKey || e.metaKey }; return; }
   if (TOOL === 'marquee' && curMode() === 'layout' && e.button === 0 && !e.shiftKey && !ptrs.size && marqDown(e)) return;
+  if (TOOL === 'green' && curMode() === 'layout' && e.button === 0 && !e.shiftKey && !ptrs.size && greenDown(e)) return;
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, pan: e.button === 2 || e.shiftKey || TOOL === 'pan' }); });
 canvas.addEventListener('pointerup', e => {
   if (rdrag && rdrag.id === e.pointerId) { rdragUp(); return; }
   if (stroke && stroke.id === e.pointerId) { strokeEnd(); return; }
+  if (GSTROKE && GSTROKE.id === e.pointerId) { greenUp(); return; }
   if (SDRAW && SDRAW.id === e.pointerId) { selUpDraw(e); return; }
   if (bsel && bsel.id === e.pointerId) { bselEnd(); return; }
   if (gdrag && gdrag.id === e.pointerId) { gizUp(e); return; }
@@ -1964,6 +2064,7 @@ canvas.addEventListener('pointermove', e => {
   if (ARMED && !ptrs.size) { ghostAt(e); }
   if (rdrag && rdrag.id === e.pointerId) { rdragMove(e); return; }
   if (stroke && stroke.id === e.pointerId) { strokeAdd(e); return; }
+  if (TOOL === 'green' && curMode() === 'layout' && !ptrs.size) { greenMove(e); if (GSTROKE && GSTROKE.id === e.pointerId) return; }
   if (TOOL === 'marquee' && SDRAW && (SDRAW.id === e.pointerId || SDRAW.click)) { selMoveDraw(e); if (SDRAW && SDRAW.id === e.pointerId) return; }
   if (bsel && bsel.id === e.pointerId) { bsel.x = e.clientX; bsel.y = e.clientY; redraw(); return; }
   if (gdrag && gdrag.id === e.pointerId) { gizMove(e); return; }
@@ -2021,7 +2122,7 @@ function patchModel(S, rect) {
   for (let y = 0; y < H; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
     const st = S.blocks.get(x + ',' + y + ',' + z);
     let id = st === undefined ? air : m.pidx.get(st);
-    if (id === undefined) { id = m.palette.length; m.palette.push(st); m.pidx.set(st, id); ctx.defs.push(resolveDef(st)); ctx.n++; }
+    if (id === undefined) { id = m.palette.length; m.palette.push(st); m.pidx.set(st, id); ctx.defs.push(resolveDefV(st)); ctx.n++; }
     const i = x + z * W + y * W * L; m.data[i] = id;
     const d = ctx.defs[id]; ctx.opaque[i] = d && d.full && !d.transparent && !d.skip ? 1 : 0;
   }
@@ -2034,7 +2135,7 @@ function patchModel(S, rect) {
   redraw();
 }
 function showModel(m, label, spec, report, roles, keepView) {
-  model = m; curSpec = spec || null; curLabel = label || ''; if ($('expst')) expStatus('');
+  model = m; curSpec = spec || null; curLabel = label || ''; if ($('expst')) expStatus(''); gverHint();
   setupRecolor(m, roles);
   $('fname').textContent = label;
   $('sz').textContent = `${m.W}×${m.H}×${m.L}`;
@@ -2381,8 +2482,21 @@ function genWorkerMain() {
     else { S.blocks = cT.S.blocks; S.box = TW.S0.box.map(v => v.slice()); }
     S.box[1][1] = topOf(S); return S;
   };
+  // 绿化: the greenery overlay is kept apart from the town's blocks (TW.OV) and recomputed only where it changed
+  const gUpdate = (T, rect) => { const r = M.greenOverlay(T, [...(TW.AUTO || []), ...(TW.GL || [])], TW.OV ? rect : null, TW.OV); TW.OV = r.ov; TW.OVY = r.maxY; return r; };
+  const fullModel = T => { const SW = wholeOf(T); return M.greenWith(SW, TW.OV, () => { SW.box[1][1] = Math.max(SW.box[1][1], TW.OVY); return SW.toModel(); }); };
   Object.assign(H, {
-    townGen({ base, region, args, ver, baseTag }) {
+    townGreen({ green, rect, curH, ver }) {
+      if (!TW || TW.ver !== ver) return { res: { stale: true } };
+      TW.GL = green ? green.layers : null;
+      if (!TW.cstate) { const c = M.composeTown(TW.scene); TW.cstate = c.state; TW.boxes = c.boxes; gUpdate(c.T, null); return out(fullModel(c.T), { boxes: [...c.boxes], n: TW.OV.size }); }
+      const T = TW.cstate.T, g = gUpdate(T, rect);
+      if (!rect || TW.OVY >= curH) return out(fullModel(T), { n: TW.OV.size });
+      if (!g.clip) return { res: { n: TW.OV.size } };
+      const sub = M.greenWith(T.S, TW.OV, () => subOf(T.S, g.clip, curH, TW.W, TW.L));
+      return { res: { sub, n: TW.OV.size }, transfer: [sub.data.buffer] };
+    },
+    townGen({ base, region, args, ver, baseTag, green }) {
       // ---- local redo: same base, same everything except some roads -> only the area round those roads ----
       let inc = null;
       if (TW && TW.args && TW.baseTag === baseTag && JSON.stringify(TW.region) === JSON.stringify(region)) {
@@ -2404,13 +2518,13 @@ function genWorkerMain() {
       if (region) { work = new M.Structure(); for (const [k, st] of S.blocks) { const [x, , z] = k.split(',').map(Number); if (x >= region[0] && x <= region[2] && z >= region[1] && z <= region[3]) work.blocks.set(k, st); } work.box = [[region[0], S.box[0][1], region[1]], [region[2], S.box[1][1], region[3]]]; }
       const S0 = { blocks: new Map(S.blocks), box: S.box.map(v => v.slice()) };
       const T = new M.Terrain(work), r0 = M.town(T, inc ? { ...args, onlyRoads: inc.changed, fixed: inc.fixed } : args), C = M.composeTown(r0.scene);
-      TW = { S0, region, scene: r0.scene, cstate: C.state, W: base.W, L: base.L, ver, args, baseTag, boxes: C.boxes };
-      const SW = wholeOf(C.T), m = SW.toModel();
+      TW = { S0, region, scene: r0.scene, cstate: C.state, W: base.W, L: base.L, ver, args, baseTag, boxes: C.boxes, GL: green ? green.layers : null, OV: null, OVY: -1, AUTO: M.greenAuto(r0.scene, args.zones) };
+      gUpdate(C.T, null); const m = fullModel(C.T);
       return out(m, { report: r0.report, boxes: [...C.boxes], mirror: mirror(r0.scene) });
     },
-    townEmpty({ base, budget, ver }) {
+    townEmpty({ base, budget, ver, green }) {
       const S = toS(base), T = new M.Terrain(S);
-      TW = { S0: { blocks: new Map(S.blocks), box: S.box.map(v => v.slice()) }, region: null, scene: M.emptyScene(T, budget), cstate: null, W: base.W, L: base.L, ver };
+      TW = { S0: { blocks: new Map(S.blocks), box: S.box.map(v => v.slice()) }, region: null, scene: M.emptyScene(T, budget), cstate: null, W: base.W, L: base.L, ver, GL: green ? green.layers : null, OV: null, OVY: -1 };
       return { res: { ok: true } };
     },
     townCompose({ items, nextId, fallback, guards, ver }) {
@@ -2419,7 +2533,7 @@ function genWorkerMain() {
       let c = M.composeTown(sc), reverted = false;
       if (fallback && guards.some(g => c.clashes.includes(g))) { sc.items = fallback; c = M.composeTown(sc); reverted = true; }
       TW.cstate = c.state; TW.boxes = c.boxes;
-      const m = wholeOf(c.T).toModel();
+      gUpdate(c.T, null); const m = fullModel(c.T);
       return out(m, { boxes: [...c.boxes], warn: c.warn, check: { total: c.check.total }, earth: c.earth, reverted });
     },
     townRetouch({ items, nextId, ids, fallback, guards, curH, ver }) {
@@ -2434,9 +2548,11 @@ function genWorkerMain() {
       }
       TW.boxes = r.boxes;
       const extra = { boxes: [...r.boxes], warn: r.warn, check: { total: r.check.total }, earth: r.earth, reverted };
-      if (r.maxY >= curH) { const m = wholeOf(r.T).toModel(); return out(m, extra); }   // grew above the model box
-      if (!r.rect) return { res: extra };
-      const sub = subOf(r.T.S, r.rect, curH, TW.W, TW.L);
+      let rect = r.rect;
+      if (rect && ((TW.GL && TW.GL.length) || (TW.OV && TW.OV.size))) { const g = gUpdate(r.T, rect); if (g.clip) rect = [Math.min(rect[0], g.clip[0]), Math.min(rect[1], g.clip[1]), Math.max(rect[2], g.clip[2]), Math.max(rect[3], g.clip[3])]; }
+      if (r.maxY >= curH || TW.OVY >= curH) return out(fullModel(r.T), extra);   // grew above the model box
+      if (!rect) return { res: extra };
+      const sub = M.greenWith(r.T.S, TW.OV, () => subOf(r.T.S, rect, curH, TW.W, TW.L));
       return { res: { ...extra, sub }, transfer: [sub.data.buffer] };
     },
   });
@@ -2523,7 +2639,7 @@ function patchSub(sub) {
     if ((m.palette[m.data[i]] || 'minecraft:air') === st) continue;          // unchanged: no remesh
     fb[0] = Math.min(fb[0], x); fb[1] = Math.min(fb[1], y); fb[2] = Math.min(fb[2], z); fb[3] = Math.max(fb[3], x); fb[4] = Math.max(fb[4], y); fb[5] = Math.max(fb[5], z);
     let id = m.pidx.get(st);
-    if (id === undefined) { id = m.palette.length; m.palette.push(st); m.pidx.set(st, id); ctx.defs.push(resolveDef(st)); ctx.n++; }
+    if (id === undefined) { id = m.palette.length; m.palette.push(st); m.pidx.set(st, id); ctx.defs.push(resolveDefV(st)); ctx.n++; }
     m.data[i] = id;
     const d = ctx.defs[id]; ctx.opaque[i] = d && d.full && !d.transparent && !d.skip ? 1 : 0;
     mark(x, z);
@@ -2573,7 +2689,7 @@ function runTown(after, live) {
   } catch (e) { tStatus('生成失败：' + e.message, true); return; }
   if (!live) tStatus('生成中…');
   const ver = ++TOWN_VER; TOWN_GEN_PENDING++;
-  GW.call('town', 'townGen', { base: { W: base.W, H: base.H, L: base.L, palette: base.palette, data: base.data }, region, args, ver, baseTag: baseTagOf(base) }, 'coalesce').then(r => {
+  GW.call('town', 'townGen', { base: { W: base.W, H: base.H, L: base.L, palette: base.palette, data: base.data }, region, args, ver, baseTag: baseTagOf(base), green: greenArgs() }, 'coalesce').then(r => {
     if (!r || ver !== TOWN_VER) return;               // replaced by a newer request
     const label = `街区 · 种子 ${$('t_seed').value}`;
     TOWN = { remote: true, cstate: 'remote', ver, region, geo: base.geo || null, label, scene: townMirror(r.mirror), boxes: new Map(r.boxes), report: r.report, suppress };
@@ -2615,7 +2731,9 @@ function runTownSync(after) {
         for (const [k, st] of work.blocks) S.blocks.set(k, st);
         S.box[1][1] = Math.max(S.box[1][1], work.box[1][1]);
       }
-      finishTerrain(S, geo, label, (region ? [`选区 ${region[2] - region[0] + 1}×${region[3] - region[1] + 1}`] : []).concat(r.report), $('t_status'), t0);
+      TOWN.AUTO = MCGen.greenAuto(r0.scene, zones);
+      { const g = MCGen.greenOverlay(C.T, greenLayersAll(), null, null); TOWN.OV = g.ov; TOWN.OVY = g.maxY;
+        MCGen.greenWith(S, g.ov, () => { S.box[1][1] = Math.max(S.box[1][1], g.maxY); finishTerrain(S, geo, label, (region ? [`选区 ${region[2] - region[0] + 1}×${region[3] - region[1] + 1}`] : []).concat(r.report), $('t_status'), t0); }); }
       TOWN.model = TER.result; TOWN.boxes = C.boxes; TOWN.cstate = C.state; refreshOverlay();
       if (TOOL !== 'point' && TOOL !== 'brush') setTool('select');
       if (typeof after === 'function') after();
@@ -2688,6 +2806,10 @@ const PANEL_GROUPS = {
     ['结构与装饰', ['c_cd_flying_buttresses', 'c_cd_pinnacles', 'c_cd_pinnacle_forest', 'c_cd_roof_style']],
     ['附属', ['c_cd_campanile', 'c_cd_court']],
     ['材质预设', ['c_cd_walls', 'c_cd_roof', 'c_cd_glass']], ['室内', ['c_cd_interior']]],
+  green: [['基本', ['c_gr_swatch', 'c_gr_preview', 'c_gr_density', 'c_gr_seed']], ['体积与尺寸', ['c_gr_width', 'c_gr_length']],
+    ['地面', ['c_gr_ground', 'c_gr_ground_patch']], ['地被', ['c_gr_cover_amount', 'c_gr_cover']], ['花', ['c_gr_flowers_amount', 'c_gr_flowers_clump', 'c_gr_from_flowers', 'c_gr_flowers']],
+    ['灌木', ['c_gr_shrubs_amount', 'c_gr_shrubs_spacing', 'c_gr_shrubs_size', 'c_gr_from_shrubs', 'c_gr_shrubs']], ['树', ['c_gr_trees_amount', 'c_gr_trees_spacing', 'c_gr_from_trees', 'c_gr_trees']],
+    ['边缘', ['c_gr_edge_kind', 'c_gr_edge_block', 'c_gr_edge_border', 'c_gr_edge_height']], ['色板', ['c_gr_name']]],
   plaza: [['基本', ['c_plaza_shape', 'c_plaza_center', 'c_plaza_seed']], ['体积与尺寸', ['c_plaza_width', 'c_plaza_length']], ['铺装', ['c_plaza_paving', 'c_plaza_pattern', 'c_plaza_curb']],
     ['摊位', ['c_plaza_stalls', 'c_plaza_goods', 'c_plaza_stall_roof']], ['树', ['c_plaza_trees', 'c_plaza_tree_layout', 'c_plaza_tree_species', 'c_plaza_tree_size', 'c_plaza_tree_spacing', 'c_plaza_planter']], ['设施', ['c_plaza_lamps', 'c_plaza_benches']]],
 };
@@ -2702,6 +2824,10 @@ const PANEL_DEPS = {
   c_cd_chapels: () => val('c_cd_east_end') === 'chevet', c_cd_chapel_depth: () => val('c_cd_east_end') === 'chevet' && +val('c_cd_chapels') > 0,
   c_mn_ribbons: () => val('c_mn_kind') === 'maypole',
   c_plaza_tree_layout: () => +val('c_plaza_trees') > 0, c_plaza_tree_species: () => +val('c_plaza_trees') > 0, c_plaza_tree_size: () => +val('c_plaza_trees') > 0, c_plaza_tree_spacing: () => +val('c_plaza_trees') > 0, c_plaza_planter: () => +val('c_plaza_trees') > 0,
+  c_gr_flowers_clump: () => +val('c_gr_flowers_amount') > 0, c_gr_from_flowers: () => +val('c_gr_flowers_amount') > 0, c_gr_flowers: () => +val('c_gr_flowers_amount') > 0, c_gr_cover: () => +val('c_gr_cover_amount') > 0,
+  c_gr_shrubs_spacing: () => +val('c_gr_shrubs_amount') > 0, c_gr_shrubs_size: () => +val('c_gr_shrubs_amount') > 0, c_gr_from_shrubs: () => +val('c_gr_shrubs_amount') > 0, c_gr_shrubs: () => +val('c_gr_shrubs_amount') > 0,
+  c_gr_trees_spacing: () => +val('c_gr_trees_amount') > 0, c_gr_from_trees: () => +val('c_gr_trees_amount') > 0, c_gr_trees: () => +val('c_gr_trees_amount') > 0,
+  c_gr_edge_block: () => val('c_gr_edge_kind') === 'hedge', c_gr_edge_height: () => val('c_gr_edge_kind') === 'hedge', c_gr_edge_border: () => val('c_gr_edge_kind') === 'border',
   c_plaza_goods: () => +val('c_plaza_stalls') > 0, c_plaza_stall_roof: () => +val('c_plaza_stalls') > 0,
 };
 document.addEventListener('change', e => {   // 风格: copy the style's starting values into the panel (each can still be changed)
@@ -2766,7 +2892,7 @@ function showAdjust(panel, prefix, req, res) {
   }
   return lines.length ? `⚠ ${lines.length} 项没能按设定生成：${lines.join('；')}（原因见对应输入框下方）　` : '';
 }
-const COMP_PREFIX = { lamp: 'c_lamp_', tree: 'c_tree_', well: 'c_well_', stall: 'c_stall_', fountain: 'c_ft_', monument: 'c_mn_', church: 'c_ch_', cathedral: 'c_cd_', plaza: 'c_plaza_' };
+const COMP_PREFIX = { lamp: 'c_lamp_', tree: 'c_tree_', well: 'c_well_', stall: 'c_stall_', fountain: 'c_ft_', monument: 'c_mn_', church: 'c_ch_', cathedral: 'c_cd_', plaza: 'c_plaza_', green: 'c_gr_' };
 const compPanel = t => document.querySelector(`.ctype[data-ctype="${t}"]`);
 queueMicrotask(regroupPanels);
 // every seed field gets a 换一个 button (like the house's): new random seed, then the usual change → regenerate
@@ -2842,8 +2968,114 @@ function compSpec() {
     return { type: 'monument', style: k, kind: k, top: sel.value, steps: +val('c_mn_steps'), height: +val('c_mn_height'), material: val('c_mn_material'), wood: val('c_mn_wood'), ribbons: val('c_mn_ribbons'), flowers: val('c_mn_flowers'), seed: +val('c_mn_seed') };
   }
   if (ctype === 'plaza') return { type: 'plaza', style: val('c_plaza_shape'), shape: val('c_plaza_shape'), width: +val('c_plaza_width'), length: +val('c_plaza_length'), paving: val('c_plaza_paving'), pattern: val('c_plaza_pattern'), center: val('c_plaza_center'), stalls: +val('c_plaza_stalls'), goods: val('c_plaza_goods'), stall_roof: val('c_plaza_stall_roof'), lamps: val('c_plaza_lamps'), trees: +val('c_plaza_trees'), tree_layout: val('c_plaza_tree_layout'), tree_species: val('c_plaza_tree_species'), tree_size: val('c_plaza_tree_size'), tree_spacing: +val('c_plaza_tree_spacing'), planter: val('c_plaza_planter'), benches: val('c_plaza_benches'), curb: val('c_plaza_curb'), seed: +val('c_plaza_seed') };
+  if (ctype === 'green') { const sw = val('c_gr_swatch'); return { type: 'green', style: MCGen.GREEN_SWATCHES[sw] ? sw : 'custom', swatch: sw, width: +val('c_gr_width'), length: +val('c_gr_length'), preview: val('c_gr_preview'), density: +val('c_gr_density'), seed: +val('c_gr_seed'), recipe: greenReadPanel() }; }
   return { type: 'well', style: val('c_well_style'), stone: val('c_well_stone'), wood: val('c_well_wood'), seed: +val('c_well_seed') };
 }
+
+// ---- 绿化配方 panel: weighted lists (gmix), swatches (绿化颜色) kept in this browser ----
+const GREEN_KEY = 'mcgen.green.swatches';
+let GREEN_USER = []; try { GREEN_USER = JSON.parse(localStorage.getItem(GREEN_KEY) || '[]').filter(s => s && s.id && s.name && s.recipe); } catch (e) { GREEN_USER = []; }
+const greenStore = () => { try { localStorage.setItem(GREEN_KEY, JSON.stringify(GREEN_USER)); return true; } catch (e) { return false; } };
+const greenBlockOf = n => n.startsWith('leaf:') ? n.slice(5) + '_leaves' : /:[ml]$/.test(n) ? n.split(':')[0] + '_log' : n;
+function greenMixRender(box) {
+  const tab = MCGen[box.dataset.opts], inp = $(box.dataset.for); let list = []; try { list = JSON.parse(inp.value || '[]'); } catch (e) { }
+  const tot = list.reduce((a, e) => a + (+e[1] || 0), 0) || 1, opts = Object.entries(tab);
+  box.innerHTML = list.map(([n, w], i) => {
+    const to = GVER === MCGen.GAME_VERSION_DEFAULT ? null : MCGen.verState('minecraft:' + greenBlockOf(n), GVER), note = to && to !== 'minecraft:' + greenBlockOf(n) ? `<span class="gver">按所选游戏版本会换成：${to === 'minecraft:air' ? '去掉' : (n => MCGen.GREEN_COVER[n] || MCGen.GREEN_FLOWERS[n] || MCGen.GREEN_GROUND[n] || n)(to.replace('minecraft:', '').replace(/\[.*$/, ''))}</span>` : '';
+    return `<div class="gmrow" data-i="${i}"><select data-k="n">${opts.map(([k, t]) => `<option value="${k}"${k === n ? ' selected' : ''}>${t}</option>`).join('')}</select><input type="number" data-k="w" min="0" max="999" step="1" value="${w}" aria-label="比例"><span class="pct">${Math.round(100 * (+w || 0) / tot)}%</span><button type="button" data-k="x" title="去掉这一种" aria-label="去掉">×</button>${note}</div>`;
+  }).join('') + `<button type="button" class="gmadd">＋ 添加一种</button>`;
+}
+function greenMixSet(id, list) { const inp = $(id); inp.value = JSON.stringify(list); const box = document.querySelector(`.gmix[data-for="${id}"]`); if (box) greenMixRender(box); }
+function greenMixRefresh() { document.querySelectorAll('.gmix').forEach(greenMixRender); }
+document.querySelectorAll('.gmix').forEach(box => {
+  const upd = (e, rerender) => {
+    const inp = $(box.dataset.for); let list = []; try { list = JSON.parse(inp.value || '[]'); } catch (er) { }
+    const row = e.target.closest('.gmrow'), i = row ? +row.dataset.i : -1, k = e.target.dataset.k;
+    if (k === 'n') list[i][0] = e.target.value; else if (k === 'w') list[i][1] = Math.max(0, +e.target.value || 0);
+    inp.value = JSON.stringify(list);
+    if (rerender) greenMixRender(box); else { const tot = list.reduce((a, x) => a + (+x[1] || 0), 0) || 1; box.querySelectorAll('.gmrow').forEach((r, j) => { r.querySelector('.pct').textContent = Math.round(100 * (+list[j][1] || 0) / tot) + '%'; }); }
+  };
+  box.addEventListener('input', e => upd(e, false));
+  box.addEventListener('change', e => upd(e, e.target.dataset.k === 'n'));
+  box.addEventListener('click', e => {
+    const inp = $(box.dataset.for); let list = []; try { list = JSON.parse(inp.value || '[]'); } catch (er) { }
+    if (e.target.classList.contains('gmadd')) { const used = new Set(list.map(x => x[0])), k = Object.keys(MCGen[box.dataset.opts]).find(n => !used.has(n)) || Object.keys(MCGen[box.dataset.opts])[0]; list.push([k, 1]); }
+    else if (e.target.dataset.k === 'x') list.splice(+e.target.closest('.gmrow').dataset.i, 1);
+    else return;
+    e.preventDefault(); inp.value = JSON.stringify(list); greenMixRender(box); box.closest('.ctype').dispatchEvent(new Event('change'));
+  });
+});
+const fillSel = (id, tab) => { $(id).innerHTML = Object.entries(tab).map(([k, t]) => `<option value="${k}">${t}</option>`).join(''); };
+fillSel('c_gr_preview', MCGen.GREEN_PREVIEWS); fillSel('c_gr_shrubs_size', MCGen.GREEN_SHRUB_SIZES); fillSel('c_gr_edge_kind', MCGen.GREEN_EDGES); fillSel('c_gr_edge_border', MCGen.GREEN_BORDERS);
+fillSel('c_gr_edge_block', Object.fromEntries(Object.entries(MCGen.GREEN_SHRUBS).filter(([k]) => k.startsWith('leaf:')).map(([k, t]) => [k.slice(5) + '_leaves', t.replace('灌木', '')])));
+function greenSwatchOptions(sel) {
+  $('c_gr_swatch').innerHTML = `<optgroup label="内置">${Object.entries(MCGen.GREEN_SWATCHES).map(([k, s]) => `<option value="${k}">${s.name}</option>`).join('')}</optgroup>`
+    + (GREEN_USER.length ? `<optgroup label="我保存的">${GREEN_USER.map(s => `<option value="u:${s.id}">${s.name.replace(/</g, '&lt;')}</option>`).join('')}</optgroup>` : '');
+  $('c_gr_swatch').value = sel || 'meadow';
+}
+function greenSwatch(v) { if (v && v.startsWith('u:')) { const s = GREEN_USER.find(x => 'u:' + x.id === v); return s ? s.recipe : null; } return (MCGen.GREEN_SWATCHES[v] || {}).recipe || null; }
+function greenLoad(recipe) {
+  const R = MCGen.greenRecipe(recipe), set = (id, v) => { $(id).value = v; };
+  greenMixSet('c_gr_ground', R.ground); set('c_gr_ground_patch', R.ground_patch);
+  set('c_gr_cover_amount', R.cover.amount); greenMixSet('c_gr_cover', R.cover.items);
+  set('c_gr_flowers_amount', R.flowers.amount); set('c_gr_flowers_clump', Math.round(R.flowers.clump * 100)); set('c_gr_from_flowers', R.from.flowers); greenMixSet('c_gr_flowers', R.flowers.items);
+  set('c_gr_shrubs_amount', R.shrubs.amount); set('c_gr_shrubs_spacing', R.shrubs.spacing); set('c_gr_shrubs_size', R.shrubs.size); set('c_gr_from_shrubs', R.from.shrubs); greenMixSet('c_gr_shrubs', R.shrubs.items);
+  set('c_gr_trees_amount', R.trees.amount); set('c_gr_trees_spacing', R.trees.spacing); set('c_gr_from_trees', R.from.trees); greenMixSet('c_gr_trees', R.trees.items);
+  set('c_gr_edge_kind', R.edge.kind); set('c_gr_edge_block', R.edge.block); set('c_gr_edge_border', R.edge.border); set('c_gr_edge_height', R.edge.height);
+  if (typeof updateDeps === 'function') updateDeps();
+}
+function greenReadPanel() {
+  const J = id => { try { return JSON.parse($(id).value || '[]'); } catch (e) { return []; } }, n = id => +val(id);
+  return { ground: J('c_gr_ground'), ground_patch: n('c_gr_ground_patch'),
+    cover: { amount: n('c_gr_cover_amount'), items: J('c_gr_cover') },
+    flowers: { amount: n('c_gr_flowers_amount'), clump: n('c_gr_flowers_clump') / 100, items: J('c_gr_flowers') },
+    shrubs: { amount: n('c_gr_shrubs_amount'), spacing: n('c_gr_shrubs_spacing'), size: val('c_gr_shrubs_size'), items: J('c_gr_shrubs') },
+    trees: { amount: n('c_gr_trees_amount'), spacing: n('c_gr_trees_spacing'), items: J('c_gr_trees') },
+    from: { flowers: n('c_gr_from_flowers'), shrubs: n('c_gr_from_shrubs'), trees: n('c_gr_from_trees') },
+    edge: { kind: val('c_gr_edge_kind'), block: val('c_gr_edge_block'), border: val('c_gr_edge_border'), height: n('c_gr_edge_height') } };
+}
+greenSwatchOptions('meadow'); greenLoad(greenSwatch('meadow'));
+document.addEventListener('change', e => {   // picking a swatch copies its recipe into the panel (every value can still be changed)
+  if (!e.target || e.target.id !== 'c_gr_swatch') return;
+  const r = greenSwatch(e.target.value); if (r) greenLoad(r);
+  const s = GREEN_USER.find(x => 'u:' + x.id === e.target.value); $('c_gr_name').value = s ? s.name : '';
+}, true);
+const greenHint = t => { $('c_gr_hint').textContent = t || ''; };
+$('c_gr_save').addEventListener('click', () => {
+  const name = $('c_gr_name').value.trim(); if (!name) { greenHint('先给这个配方起个名字。'); $('c_gr_name').focus(); return; }
+  let s = GREEN_USER.find(x => x.name === name);
+  if (s) s.recipe = MCGen.greenRecipe(greenReadPanel()); else { s = { id: Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), name, recipe: MCGen.greenRecipe(greenReadPanel()) }; GREEN_USER.push(s); }
+  const ok = greenStore(); greenSwatchOptions('u:' + s.id);
+  greenHint(ok ? `已保存为绿化颜色“${name}”，布局模式的绿化笔刷里可以直接选。` : '浏览器存储不可用，这个绿化颜色只在本次打开期间有效。');
+  if (typeof greenPalette === 'function') greenPalette();
+});
+$('c_gr_del').addEventListener('click', () => {
+  const v = $('c_gr_swatch').value; if (!v.startsWith('u:')) { greenHint('内置的绿化颜色不能删除。'); return; }
+  const s = GREEN_USER.find(x => 'u:' + x.id === v); GREEN_USER = GREEN_USER.filter(x => 'u:' + x.id !== v); greenStore();
+  greenSwatchOptions('meadow'); greenLoad(greenSwatch('meadow')); $('c_gr_name').value = ''; greenHint(s ? `已删除“${s.name}”。` : ''); runComp();
+  if (typeof greenPalette === 'function') greenPalette();
+});
+$('c_gr_export').addEventListener('click', async () => {
+  if (!GREEN_USER.length) { greenHint('还没有保存过绿化颜色。'); return; }
+  const json = new TextEncoder().encode(JSON.stringify({ app: 'mc-house-generator', kind: 'green-swatches', v: 1, swatches: GREEN_USER.map(s => ({ name: s.name, recipe: s.recipe })) }, null, 1)), base = 'mc-绿化颜色-' + new Date().toISOString().slice(0, 10);
+  const dl = window.claude && typeof window.claude.use === 'function' ? await window.claude.use('downloads').catch(() => null) : null;
+  try {
+    if (dl) { await dl.save({ filename: base + '.zip', data: zipFiles([{ name: 'green-swatches.json', data: json }]) }); greenHint(`已导出 ${GREEN_USER.length} 个绿化颜色（${base}.zip）。`); }
+    else { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' })); a.download = base + '.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); greenHint(`已导出 ${GREEN_USER.length} 个绿化颜色（${base}.json）。`); }
+  } catch (e) { greenHint(e && e.code === 'declined' ? '已取消导出。' : '导出失败：' + (e && (e.message || e.code))); }
+});
+$('c_gr_import').addEventListener('click', () => $('c_gr_file').click());
+$('c_gr_file').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return; e.stopPropagation();
+  try {
+    const P = await readProjectFile(f, /\.json$/); const list = P && P.kind === 'green-swatches' && Array.isArray(P.swatches) ? P.swatches : null;
+    if (!list) throw new Error('不是绿化颜色文件');
+    let n = 0; for (const s of list) { if (!s || !s.name || !s.recipe) continue; const name = String(s.name).slice(0, 24), old = GREEN_USER.find(x => x.name === name), recipe = MCGen.greenRecipe(s.recipe);
+      if (old) old.recipe = recipe; else GREEN_USER.push({ id: Date.now().toString(36) + (n + Math.random()).toString(36).slice(2, 6), name, recipe }); n++; }
+    greenStore(); greenSwatchOptions($('c_gr_swatch').value); greenHint(`已导入 ${n} 个绿化颜色（同名的已覆盖）。`);
+    if (typeof greenPalette === 'function') greenPalette();
+  } catch (er) { greenHint('导入失败：' + er.message); }
+}, true);
 function runComp() {
   if (GW.ok) {
     let sp; try { sp = compSpec(); } catch (e) { $('c_status').textContent = '生成失败：' + e.message; return; }
@@ -2957,7 +3189,7 @@ function viewBase() {
 }
 function viewResult() { if (!TER.result) return; showModel(TER.result, TER.result.label, null, null, null, true); viewing = 'result'; refreshOverlay(); }
 let viewing = null;
-function terrainChanged() { SELD = null; SDRAW = null; TOWN = null; SEL = null; picks.roads = []; picks.zones = []; picks._lr = []; if (typeof renderZones === 'function') renderZones(); TER.result = null; $('g_view_res').disabled = true; picks.route = []; picks.region = []; $('t_useregion').checked = false; viewBase(); }
+function terrainChanged() { picks.green = null; if (typeof greenPanel === 'function') greenPanel(); SELD = null; SDRAW = null; TOWN = null; SEL = null; picks.roads = []; picks.zones = []; picks._lr = []; if (typeof renderZones === 'function') renderZones(); TER.result = null; $('g_view_res').disabled = true; picks.route = []; picks.region = []; $('t_useregion').checked = false; viewBase(); }
 document.querySelectorAll('input[name="tsrc"]').forEach(r => r.addEventListener('change', () => {
   TER.src = r.value; $('tdef').hidden = TER.src !== 'default'; $('timp').hidden = TER.src !== 'import'; terrainChanged();
 }));
@@ -3132,6 +3364,7 @@ function encodeSchem(m) {
     let k = remap[id];
     if (k < 0) { let st = m.palette[id] || 'minecraft:air'; if (!st.includes(':')) st = 'minecraft:' + st;
       if (/^minecraft:(cave_|void_)?air$/.test(st)) st = 'minecraft:air';
+      st = MCGen.verState(st, GVER);
       if (!used.has(st)) used.set(st, used.size); k = remap[id] = used.get(st); }
     while (k > 0x7f) { bytes.push((k & 0x7f) | 0x80); k >>>= 7; } bytes.push(k);
   }
@@ -3141,7 +3374,7 @@ function encodeSchem(m) {
   const tag = (type, name) => { u8(type); str(name); };
   tag(10, 'Schematic');
   tag(3, 'Version'); i32(2);
-  tag(3, 'DataVersion'); i32(3953);
+  tag(3, 'DataVersion'); i32(MCGen.verDV(GVER));
   tag(2, 'Width'); u16(m.W); tag(2, 'Height'); u16(m.H); tag(2, 'Length'); u16(m.L);
   const off = (m.geo && m.geo.offset) || [0, 0, 0];
   tag(11, 'Offset'); i32(3); i32(off[0]); i32(off[1]); i32(off[2]);
@@ -3188,17 +3421,17 @@ async function exportSchem() {
       const files = [{ name: base + '.schem', data: schem }];
       if (curSpec) files.push({ name: base + '.json', data: new TextEncoder().encode(JSON.stringify(curSpec, null, 2)) });
       files.push({ name: '放进游戏.txt', data: new TextEncoder().encode(HOWTO) });
-      try { await dl.save({ filename: base + '.zip', data: zipFiles(files) }); expStatus(`已保存 ${base}.zip，解压后得到 ${base}.schem。`); }
+      try { await dl.save({ filename: base + '.zip', data: zipFiles(files) }); expStatus(`已保存 ${base}.zip，解压后得到 ${base}.schem。` + gverSummary(model)); }
       catch (e) { expStatus(e && e.code === 'declined' ? '已取消保存。' : '保存失败：' + (e && (e.message || e.code)), e && e.code !== 'declined'); }
     } else {
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([schem])); a.download = base + '.schem';
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-      expStatus(`已导出 ${base}.schem。`);
+      expStatus(`已导出 ${base}.schem。` + gverSummary(model));
     }
   } catch (e) { expStatus('导出失败：' + e.message, true); console.error(e); }
   finally { btn.disabled = false; }
 }
-const HOWTO = `把 .schem 放进游戏（Minecraft 1.21 及以上，建议 1.21.10）
+const HOWTO = `把 .schem 放进游戏（游戏版本要不低于导出时选的"目标游戏版本"，默认 1.21.5）
 
 WorldEdit / FAWE：
   1. 把 .schem 放进 schematics 文件夹
@@ -3215,12 +3448,14 @@ Litematica（投影）：
 同一个文件夹里的 .json 是生成参数，可以用 python generate.py 参数.json 输出.schem 重新生成。
 `;
 $('exp').addEventListener('click', exportSchem);
+$('gver').innerHTML = MCGen.GAME_VERSIONS.map(g => `<option value="${g.id}">${g.label}</option>`).join(''); $('gver').value = GVER;
+$('gver').addEventListener('change', e => setGver(e.target.value));
 
 if (initGL()) { if (SAMPLES.length) samplesEl.querySelector('.chip').click(); restorePack(); }
 
 // ---- tools (left strip) + options bar
 var TOOL = 'select', mq = null;
-const TOOL_MODES = { select: ['comp', 'layout'], view: ['comp', 'site', 'layout'], pan: ['comp', 'site', 'layout'], point: ['site', 'layout'], brush: ['site', 'layout'], drag: ['site', 'layout'], marquee: ['layout'] };
+const TOOL_MODES = { select: ['comp', 'layout'], view: ['comp', 'site', 'layout'], pan: ['comp', 'site', 'layout'], point: ['site', 'layout'], brush: ['site', 'layout'], drag: ['site', 'layout'], marquee: ['layout'], green: ['layout'] };
 function setTool(t) {
   if (!TOOL_MODES[t].includes(curMode())) return;
   TOOL = t;
@@ -3398,6 +3633,8 @@ function selApply() {
   if (SDRAW && SDRAW.click) selCloseDraw();
   if (!SELD) { selHint('先在地面上画一个选区'); return; }
   if (!baseModel()) { tStatus('先在"地形"里选择默认地形或导入地形', true); return; }
+  if ($('o_zone').value === 'green') { if (curMode() !== 'layout' || !ensureTown()) return; const M0 = SELD.mask, cells = new Map(); for (let x = M0.x0; x <= M0.x1; x++) for (let z = M0.z0; z <= M0.z1; z++) if (M0.has(x, z)) cells.set(x + ',' + z, 1);
+    const keep = GB.op; GB.op = 100; greenApply(cells, `用“${greenSwatchName($('o_gcolor').value)}”填满了选区（${cells.size} 格）`, 'paint'); GB.op = keep; SELD = null; selHint(); refreshOverlay(); return; }
   const kind = $('o_zone').value, M = SELD.mask, shapes = SELD.shapes, box = { x0: M.x0, z0: M.z0, x1: M.x1, z1: M.z1 };
   SELD = null; selHint();
   if (kind === 'range') {
@@ -3443,7 +3680,7 @@ function renderZones() {
       const nr = picks.roads.filter(r => r.district === z.id).length;
       return `<div class="rl"><div class="rl-head"><i style="background:${ZONE_COLORS.district}"></i><span class="nm">自动布局 ${z.id}</span><span class="sum">${sz} · ${nr} 条路</span><button type="button" data-zregen="${k}" title="用当前设置重新生成">重新生成</button><button type="button" class="del" data-zdel="${k}" title="删除这个布局和它生成的路、广场、地标">✕</button></div>`
         + `<div class="rl-body"><label>样式<select data-zk="${k}" data-zf="style">${opt(MCGen.DISTRICT_STYLES, z.style)}</select></label><label>疏密<select data-zk="${k}" data-zf="density">${opt(MCGen.DISTRICT_DENSITY, z.density)}</select></label>`
-        + `<label>地标<select data-zk="${k}" data-zf="landmark">${opt(MCGen.DISTRICT_LANDMARKS, z.landmark || 'auto')}</select></label><label>房屋尺寸<select data-zk="${k}" data-zf="house">${opt(MCGen.HOUSE_SIZES, z.house || 'auto')}</select></label><label>种子<span style="display:flex;gap:4px"><input type="number" data-zk="${k}" data-zf="seed" value="${z.seed}" style="min-width:0"><button type="button" data-zdice="${k}" title="随机种子">🎲</button></span></label>`
+        + `<label>地标<select data-zk="${k}" data-zf="landmark">${opt(MCGen.DISTRICT_LANDMARKS, z.landmark || 'auto')}</select></label><label>房屋尺寸<select data-zk="${k}" data-zf="house">${opt(MCGen.HOUSE_SIZES, z.house || 'auto')}</select></label><label title="离路越远绿化越浓：路边保持草地，房屋后面长成配方里的灌木和树">空地绿化<select data-zk="${k}" data-zf="green"><option value="">无</option>${Object.entries(MCGen.GREEN_SWATCHES).map(([v, s]) => `<option value="${v}"${z.green && z.green.swatch === v ? ' selected' : ''}>${s.name}</option>`).join('')}${GREEN_USER.map(s => `<option value="u:${s.id}"${z.green && z.green.swatch === 'u:' + s.id ? ' selected' : ''}>${s.name.replace(/</g, '&lt;')}</option>`).join('')}</select></label><label>种子<span style="display:flex;gap:4px"><input type="number" data-zk="${k}" data-zf="seed" value="${z.seed}" style="min-width:0"><button type="button" data-zdice="${k}" title="随机种子">🎲</button></span></label>`
         + (z.plan ? `<div class="note">${z.plan.join('<br>')}</div>` : '') + `</div></div>`;
     }
     const nm = { plaza: '广场', reserve: '保留空地', landmark: '地标 · ' + (z.item && z.item.kind === 'chapel' ? '小礼拜堂' : '教堂') }[z.kind] || z.kind;
@@ -3462,7 +3699,9 @@ $('t_zones').addEventListener('click', e => {
 });
 $('t_zones').addEventListener('change', e => {
   const t = e.target, k = t.dataset.zk; if (k == null) return;
-  const z = picks.zones[+k]; z[t.dataset.zf] = t.dataset.zf === 'seed' ? (+t.value || 1) : t.value; runDistrict(z);
+  const z = picks.zones[+k];
+  if (t.dataset.zf === 'green') { const v = t.value; z.green = v ? { swatch: v, recipe: MCGen.greenRecipe(greenSwatch(v) || {}) } : null; renderZones(); runTown(); return; }
+  z[t.dataset.zf] = t.dataset.zf === 'seed' ? (+t.value || 1) : t.value; runDistrict(z);
 });
 {
   const fill = (id, o, v) => { $(id).innerHTML = Object.entries(o).map(([k, t]) => `<option value="${k}"${k === v ? ' selected' : ''}>${typeof t === 'string' ? t : t.label}</option>`).join(''); };
@@ -3486,12 +3725,13 @@ addEventListener('keydown', e => {
   if (TOOL === 'marquee' && curMode() === 'layout' && selKey2(e)) { e.preventDefault(); return; }
   if (ARMED) { const k = e.key.toLowerCase(); if (k === 'escape') { disarm(); return; } if (k === 'q' || k === 'e') { ARMED.q = ((ARMED.q || 0) + (k === 'e' ? 1 : 3)) % 4; RECO = null; redraw(); return; } }
   if (TOOL === 'select' && SEL) { const gm = { s: 'scale', e: 'rotate', g: 'move' }[e.key.toLowerCase()]; if (gm) { GMODE = gm; renderSel(); redraw(); return; } }
-  const t = { v: 'select', r: 'view', h: 'pan', p: 'point', b: 'brush', d: 'drag', m: 'marquee' }[e.key.toLowerCase()];
+  if (TOOL === 'green' && (e.key === '[' || e.key === ']' || e.key === '{' || e.key === '}')) { greenKey(e.key); e.preventDefault(); return; }
+  const t = { v: 'select', r: 'view', h: 'pan', p: 'point', b: 'brush', d: 'drag', m: 'marquee', j: 'green' }[e.key.toLowerCase()];
   if (t) setTool(t);
 });
 // ---- selection: pick a house / prop, move it by dragging, edit it from the options bar
 var TOWN = null, SEL = null, drag = null, compRot = 0;
-const TYPE_CN = { house: '房屋', lamp: '路灯', tree: '树', well: '水井', struct: '结构', church: '教堂', cathedral: '主教座堂' };
+const TYPE_CN = { house: '房屋', lamp: '路灯', tree: '树', well: '水井', struct: '结构', church: '教堂', cathedral: '主教座堂', green: '绿化' };
 // big items: placed by their centre (cx, cz) on a level pad, can be lifted (houses, imported structures, landmarks)
 const BIG = t => t === 'house' || t === 'struct' || !!(window.MCGen && MCGen.LANDMARK_PLACE && MCGen.LANDMARK_PLACE[t]);
 function townActive() { return TOWN && curMode() === 'layout' && TER.result === TOWN.model; }
@@ -3635,8 +3875,10 @@ function retouch(ids, what, guardId) {
     r.maxY = Math.max(r.maxY, r1.maxY); what = '⚠ 不能和其他组件、道路或广场重叠，已取消这次操作';
   }
   TOWN.boxes = r.boxes;
-  if (r.maxY >= model.H) return recompose(what);         // grew above the model box: full refresh
-  if (r.rect) patchModel(r.T.S, r.rect);
+  let rect = r.rect;
+  if (rect && greenOn()) { if (!TOWN.OV) return recompose(what); const g = MCGen.greenOverlay(r.T, greenLayersAll(), rect, TOWN.OV); TOWN.OVY = g.maxY; if (g.clip) rect = [Math.min(rect[0], g.clip[0]), Math.min(rect[1], g.clip[1]), Math.max(rect[2], g.clip[2]), Math.max(rect[3], g.clip[3])]; }
+  if (r.maxY >= model.H || (TOWN.OVY || -1) >= model.H) return recompose(what);         // grew above the model box: full refresh
+  if (rect) MCGen.greenWith(r.T.S, TOWN.OV, () => patchModel(r.T.S, rect));
   const e = r.earth, el = $('t_status');
   el.classList.remove('bad');
   el.textContent = `完成，用时 ${Math.round(performance.now() - t0)} 毫秒。` + [what, `土方：挖 ${e.cut} 格、填 ${e.fill} 格；最大挖深 ${e.maxCut}、最大填高 ${e.maxFill}`].concat(r.warn.map(w => '⚠ ' + w), [r.check.total ? `放置检查：${r.check.total} 处问题` : '放置检查：通过']).join('；');
@@ -3657,7 +3899,8 @@ function recompose(what, guardId) {
   else { S.blocks = c.T.S.blocks; }
   TOWN.boxes = c.boxes; TOWN.cstate = c.state;
   const e = c.earth, lines = [what, `土方：挖 ${e.cut} 格、填 ${e.fill} 格；最大挖深 ${e.maxCut}、最大填高 ${e.maxFill}`].concat(c.warn.map(w => '⚠ ' + w), [c.check.total ? `放置检查：${c.check.total} 处问题` : '放置检查：通过']);
-  finishTerrain(S, TOWN.geo, TOWN.label, lines, $('t_status'), t0);
+  const g = MCGen.greenOverlay(c.T, greenLayersAll(), null, null); TOWN.OV = g.ov; TOWN.OVY = g.maxY;
+  MCGen.greenWith(S, g.ov, () => { S.box[1][1] = Math.max(S.box[1][1], g.maxY); finishTerrain(S, TOWN.geo, TOWN.label, lines, $('t_status'), t0); });
   TOWN.model = TER.result; renderSel(); redraw();
 }
 const gmodes = () => `<span class="seg2">${[['scale', '缩放', 'S'], ['rotate', '旋转', 'E'], ['move', '移动', 'G']].filter(([k]) => { const c = selCaps(); return !c || (k === 'move' ? c.move : k === 'rotate' ? c.rotate : Object.keys(c.scale).length); }).map(([k, t, key]) => `<button type="button" class="obtn${GMODE === k ? ' on' : ''}" data-gmode="${k}" title="${t}（${key}）">${t}</button>`).join('')}</span>`;
@@ -3809,6 +4052,7 @@ const SIZE_AX = {
   cathedral: { x: { f: 'nave_bays', id: 'c_cd_nave_bays', lab: '中殿开间', per: 8 }, z: { f: 'width', id: 'c_cd_width', lab: '中殿宽', per: 2 }, y: { f: 'clerestory_height', id: 'c_cd_clerestory_height', lab: '高侧窗层高' } },
   church: { x: { f: 'length', id: 'c_ch_length', lab: '长' }, z: { f: 'width', id: 'c_ch_width', lab: '宽' }, y: { f: 'wall_height', id: 'c_ch_wall_height', lab: '墙高' } },
   plaza: { x: { f: 'width', id: 'c_plaza_width', lab: '宽' }, z: { f: 'length', id: 'c_plaza_length', lab: '长' } },
+  green: { x: { f: 'width', id: 'c_gr_width', lab: '宽' }, z: { f: 'length', id: 'c_gr_length', lab: '长' }, y: { f: 'density', id: 'c_gr_density', lab: '浓度 %' } },
 };
 const SIZE_CN = { s: '小', m: '中', l: '大' };
 const propRot = {};                                   // component mode: quarter turns of the previewed prop
@@ -3872,6 +4116,7 @@ function drawGizmo() {
   gctx.setTransform(dpr, 0, 0, dpr, 0, 0); gctx.clearRect(0, 0, r.width, r.height);
   if (ARMED) drawReco();
   if (TOOL === 'marquee') drawSelLive();
+  if (TOOL === 'green') drawGreenCursor();
   if (GHOST) drawGhost();
   if (FLASH) drawFlash();
   if (bsel && Math.hypot(bsel.x - bsel.sx, bsel.y - bsel.sy) > 4) { const r = canvas.getBoundingClientRect(), x = Math.min(bsel.sx, bsel.x) - r.left, y = Math.min(bsel.sy, bsel.y) - r.top; gctx.fillStyle = 'rgba(74,208,232,.12)'; gctx.fillRect(x, y, Math.abs(bsel.x - bsel.sx), Math.abs(bsel.y - bsel.sy)); gctx.strokeStyle = '#4ad0e8'; gctx.lineWidth = 1; gctx.setLineDash([5, 3]); gctx.strokeRect(x + .5, y + .5, Math.abs(bsel.x - bsel.sx), Math.abs(bsel.y - bsel.sy)); gctx.setLineDash([]); }
@@ -4057,8 +4302,8 @@ function restoreRoads(sn) {
   clearTimeout(roadEditT); if (TOWN) runTown();
 }
 function pushHist() { const sn = snapshot(); if (!sn) return; HIST.push(sn); if (HIST.length > 50) HIST.shift(); REDO.length = 0; }
-function undoHist() { const sn = HIST.pop(); if (!sn) { renderSel(); return; } const cur = sn.kind === 'roads' ? roadSnap() : snapshot(); if (!cur) { renderSel(); return; } REDO.push(cur); sn.kind === 'roads' ? restoreRoads(sn) : restore(sn); renderSel(); }
-function redoHist() { const sn = REDO.pop(); if (!sn) { renderSel(); return; } const cur = sn.kind === 'roads' ? roadSnap() : snapshot(); if (!cur) { renderSel(); return; } HIST.push(cur); sn.kind === 'roads' ? restoreRoads(sn) : restore(sn); renderSel(); }
+function undoHist() { const sn = HIST.pop(); if (!sn) { renderSel(); return; } const cur = sn.kind === 'roads' ? roadSnap() : sn.kind === 'green' ? greenSnap() : snapshot(); if (!cur) { renderSel(); return; } REDO.push(cur); sn.kind === 'roads' ? restoreRoads(sn) : sn.kind === 'green' ? greenRestore(sn) : restore(sn); renderSel(); }
+function redoHist() { const sn = REDO.pop(); if (!sn) { renderSel(); return; } const cur = sn.kind === 'roads' ? roadSnap() : sn.kind === 'green' ? greenSnap() : snapshot(); if (!cur) { renderSel(); return; } HIST.push(cur); sn.kind === 'roads' ? restoreRoads(sn) : sn.kind === 'green' ? greenRestore(sn) : restore(sn); renderSel(); }
 // ---- layout roads: each finished stroke / point path becomes a road in the list
 // a road end within reach of another road snaps onto that road's centreline, so the two connect
 function snapToRoads(pt, skip) {
@@ -4433,7 +4678,7 @@ function ensureTown() {
   const S = modelToStructure(base), T = new MCGen.Terrain(S);
   TOWN = { S0: { blocks: new Map(S.blocks), box: S.box.map(v => v.slice()) }, region: null, geo: base.geo || null, label: '街区 · 手动布置', scene: MCGen.emptyScene(T, { cut: +$('t_cut').value, fill: +$('t_fill').value }), boxes: new Map() };
   TOWN.model = null;
-  if (GW.ok) { TOWN.remote = true; TOWN.cstate = 'remote'; TOWN.ver = ++TOWN_VER; GW.call('town', 'townEmpty', { ver: TOWN.ver, base: { W: base.W, H: base.H, L: base.L, palette: base.palette, data: base.data }, budget: { cut: +$('t_cut').value, fill: +$('t_fill').value } }, true); }
+  if (GW.ok) { TOWN.remote = true; TOWN.cstate = 'remote'; TOWN.ver = ++TOWN_VER; GW.call('town', 'townEmpty', { ver: TOWN.ver, base: { W: base.W, H: base.H, L: base.L, palette: base.palette, data: base.data }, budget: { cut: +$('t_cut').value, fill: +$('t_fill').value }, green: greenArgs() }, true); }
   return true;
 }
 function placeArmedAt(e) {
@@ -4502,7 +4747,7 @@ function projectJSON() {
     ? { src: 'import', name: TER.imported.tname, model: { W: TER.imported.W, H: TER.imported.H, L: TER.imported.L, palette: TER.imported.palette, data: b64e(new Uint8Array(Uint32Array.from(TER.imported.data).buffer)), geo: TER.imported.geo || null } }
     : { src: 'default', synth: TER.synth };
   const params = {}; T_PARAMS.forEach(id => { const el = $(id); params[id] = el.type === 'checkbox' ? el.checked : el.value; });
-  return { app: 'mc-house-generator', kind: 'project', v: 1, saved: new Date().toISOString(), terrain: terr, roads: picks.roads, zones: picks.zones, region: picks.region, useRegion: $('t_useregion').checked, params, items: TOWN && TOWN.scene ? TOWN.scene.items : [], suppress: TOWN && TOWN.suppress || [] };
+  return { app: 'mc-house-generator', kind: 'project', v: 1, saved: new Date().toISOString(), gameVersion: GVER, green: greenSave(), terrain: terr, roads: picks.roads, zones: picks.zones, region: picks.region, useRegion: $('t_useregion').checked, params, items: TOWN && TOWN.scene ? TOWN.scene.items : [], suppress: TOWN && TOWN.suppress || [] };
 }
 $('proj_save').addEventListener('click', async () => {
   const json = new TextEncoder().encode(JSON.stringify(projectJSON())), base = 'mc-town-' + new Date().toISOString().slice(0, 10);
@@ -4512,7 +4757,7 @@ $('proj_save').addEventListener('click', async () => {
     else { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' })); a.download = base + '.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); tStatus(`工程已保存为 ${base}.json。`); }
   } catch (e) { tStatus(e && e.code === 'declined' ? '已取消保存。' : '保存失败：' + (e && (e.message || e.code)), !(e && e.code === 'declined')); }
 });
-async function readProjectFile(f) {
+async function readProjectFile(f, want = /project\.json$/) {
   const buf = new Uint8Array(await f.arrayBuffer());
   if (buf[0] === 0x7b) return JSON.parse(new TextDecoder().decode(buf));
   const dv = new DataView(buf.buffer); let e = buf.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
@@ -4521,7 +4766,7 @@ async function readProjectFile(f) {
   for (let i = 0; i < n; i++) {
     const method = dv.getUint16(off + 10, true), csize = dv.getUint32(off + 20, true), nl = dv.getUint16(off + 28, true), xl = dv.getUint16(off + 30, true), cl = dv.getUint16(off + 32, true), lho = dv.getUint32(off + 42, true);
     const name = new TextDecoder().decode(buf.subarray(off + 46, off + 46 + nl)); off += 46 + nl + xl + cl;
-    if (!/project\.json$/.test(name)) continue;
+    if (!want.test(name)) continue;
     const start = lho + 30 + dv.getUint16(lho + 26, true) + dv.getUint16(lho + 28, true), data = buf.subarray(start, start + csize);
     return JSON.parse(new TextDecoder().decode(method === 8 ? await inflateRaw(data) : data));
   }
@@ -4541,6 +4786,8 @@ $('proj_file').addEventListener('change', async e => {
     } else { document.querySelector('input[name="tsrc"][value="default"]').checked = true; TER.src = 'default'; $('tdef').hidden = false; $('timp').hidden = true; TER.synth = P.terrain.synth; $('g_tsynth').value = P.terrain.synth; terrainChanged(); }
     // plan
     Object.entries(P.params || {}).forEach(([id, v]) => { const el = $(id); if (!el) return; if (el.type === 'checkbox') el.checked = v; else el.value = v; });
+    if (P.gameVersion) setGver(P.gameVersion);
+    greenLoadProject(P.green);
     picks.roads = P.roads || []; picks.zones = P.zones || []; picks.region = P.region || []; $('t_useregion').checked = !!P.useRegion;
     renderRoads(); renderZones(); pickInfo(); TOWN = null; window.PENDING_SUPPRESS = P.suppress || [];
     // regenerate the ground layer (deterministic), then put back exactly the saved items
@@ -4550,6 +4797,313 @@ $('proj_file').addEventListener('change', async e => {
 $('layerbtn').addEventListener('click', e => { $('layerpop').hidden = !$('layerpop').hidden; e.stopPropagation(); });
 addEventListener('pointerdown', e => { if (!$('layerpop').hidden && !e.target.closest('#layerpop, #layerbtn')) $('layerpop').hidden = true; });
 { const sync = () => { const v = $('layer'), full = +v.value >= +v.max; $('layerbv').textContent = full ? '' : 'y ≤ ' + v.value; }; $('layer').addEventListener('input', sync); new MutationObserver(sync).observe($('layer'), { attributes: true }); sync(); }
+
+// ====================== 绿化图层 + 绿化笔刷 (layout mode) ======================
+// picks.green = { layers: [{ id, name, swatch, recipe, seed, visible, tiles: { 'tx,tz': Uint8Array(256) } }], active, nextId }
+// The brush paints density (0..255) into the layer of the chosen 绿化颜色; the worker turns density into plants.
+const GB_KEY = 'mcgen.green.brush';
+// a brush = how density is laid down. mode: paint / erase / thin / blur / gradient / line. Field names follow Photoshop.
+const GB_BASE = { mode: 'paint', tip: 'round', size: 8, hard: 50, op: 100, flow: 100, spacing: 25, sizeJ: 0, scatter: 0, both: false, count: 1, countJ: 0, rough: 50, air: false, gap: 6, offset: 0, erase: 'all' };
+const GB_PRESETS = {
+  soft: { name: '柔边画笔', mode: 'paint', hard: 50 },
+  hard: { name: '硬边画笔', mode: 'paint', hard: 100 },
+  air: { name: '喷枪', mode: 'paint', hard: 0, flow: 12, air: true, spacing: 15 },
+  splat: { name: '喷溅', mode: 'paint', tip: 'splat', size: 7, hard: 80, spacing: 120, scatter: 160, both: true, count: 3, countJ: 60, sizeJ: 60, rough: 60 },
+  dots: { name: '散点', mode: 'paint', size: 3, hard: 100, spacing: 250, scatter: 400, both: true, count: 2, countJ: 100, sizeJ: 30 },
+  stamp: { name: '印章（点一下放一组）', mode: 'paint', size: 9, hard: 70, spacing: 1000 },
+  line: { name: '沿线（配“行道树”颜色种一排树）', mode: 'line', size: 1, hard: 100, gap: 7, offset: 0 },
+  erase: { name: '橡皮擦', mode: 'erase', hard: 60 },
+  thin: { name: '稀疏化', mode: 'thin', hard: 30, op: 40 },
+  blur: { name: '模糊（让边缘过渡更软）', mode: 'blur', hard: 30 },
+  gradient: { name: '渐变（拖一条线，填满选区）', mode: 'gradient', op: 100 },
+};
+const GB_UKEY = 'mcgen.green.brushes';
+let GB_USER = []; try { GB_USER = JSON.parse(localStorage.getItem(GB_UKEY) || '[]').filter(b => b && b.id && b.name); } catch (e) { GB_USER = []; }
+const GB = { ...GB_BASE, ...GB_PRESETS.soft, preset: 'soft' };
+try { const s = JSON.parse(localStorage.getItem(GB_KEY) || '{}'); for (const k of Object.keys(GB_BASE)) if (s[k] !== undefined) GB[k] = s[k]; if (s.preset) GB.preset = s.preset; } catch (e) { }
+const gbSave = () => { try { localStorage.setItem(GB_KEY, JSON.stringify(GB)); } catch (e) { } };
+function gbLoad(key) {
+  const u = key.startsWith('u:') ? GB_USER.find(b => 'u:' + b.id === key) : null, p = u ? u.brush : GB_PRESETS[key];
+  if (!p) return; const keep = { size: GB.size, erase: GB.erase };
+  Object.assign(GB, GB_BASE, p, { preset: key });
+  if (!('size' in p)) GB.size = keep.size; GB.erase = keep.erase; delete GB.name; gbSave();
+}
+const greenState = () => picks.green || (picks.green = { layers: [], active: null, nextId: 1 });
+const greenLayersAll = () => [...(TOWN && TOWN.AUTO || []), ...greenArgs().layers];
+const greenOn = () => !!(picks.green && picks.green.layers.length) || !!(TOWN && TOWN.AUTO && TOWN.AUTO.length) || !!(TOWN && TOWN.OV && TOWN.OV.size);
+function greenArgs() { const G = picks.green; return { layers: G ? G.layers.map(l => ({ id: l.id, recipe: l.recipe, seed: l.seed, visible: l.visible, tiles: l.tiles })) : [] }; }
+function greenSwatchName(v) { if (v && v.startsWith('u:')) { const s = GREEN_USER.find(x => 'u:' + x.id === v); return s ? s.name : '（已删除的绿化颜色）'; } return (MCGen.GREEN_SWATCHES[v] || {}).name || v; }
+function greenActive() { const G = greenState(); return G.layers.find(l => l.id === G.active) || null; }
+function greenLayerFor(sw) {
+  const G = greenState(); let L = G.layers.slice().reverse().find(l => l.swatch === sw);
+  if (!L) { L = { id: G.nextId, name: greenSwatchName(sw), swatch: sw, recipe: MCGen.greenRecipe(greenSwatch(sw) || {}), seed: 1 + G.nextId * 7, visible: true, tiles: {} }; G.nextId++; G.layers.push(L); }
+  G.active = L.id; return L;
+}
+const greenTileBox = L => { let b = null; for (const [k, t] of Object.entries(L.tiles)) { if (!t.some(v => v)) continue; const [tx, tz] = k.split(',').map(Number); b = b ? [Math.min(b[0], tx * 16), Math.min(b[1], tz * 16), Math.max(b[2], tx * 16 + 15), Math.max(b[3], tz * 16 + 15)] : [tx * 16, tz * 16, tx * 16 + 15, tz * 16 + 15]; } return b; };
+const boxU = (a, b) => !a ? b : !b ? a : [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])];
+// ---- options bar ----
+function greenBar() {
+  const sel = $('o_gpreset');
+  sel.innerHTML = `<optgroup label="内置">${Object.entries(GB_PRESETS).map(([k, p]) => `<option value="${k}">${p.name}</option>`).join('')}</optgroup>` + (GB_USER.length ? `<optgroup label="我保存的">${GB_USER.map(b => `<option value="u:${b.id}">${b.name.replace(/</g, '&lt;')}</option>`).join('')}</optgroup>` : '');
+  sel.value = [...sel.options].some(o => o.value === GB.preset) ? GB.preset : 'soft';
+  $('o_gsize').value = GB.size; $('o_ghard').value = GB.hard; $('o_gop').value = GB.op; $('o_gflow').value = GB.flow; $('o_gerase').value = GB.erase;
+  document.querySelectorAll('[data-gonly]').forEach(el => { el.hidden = !el.dataset.gonly.split(' ').includes(GB.mode); });
+  $('o_gcolor').closest('label').hidden = !['paint', 'line', 'gradient'].includes(GB.mode);
+  for (const k of ['spacing', 'sizeJ', 'scatter', 'count', 'countJ', 'rough', 'gap', 'offset']) $('gp_' + k).value = GB[k];
+  $('gp_tip').value = GB.tip; $('gp_both').checked = !!GB.both; $('gp_air').checked = !!GB.air;
+  $('o_ghint').textContent = { paint: '按住左键在地面上画；[ ] 改大小，Shift+[ ] 改硬度', erase: '按住左键擦掉绿化', thin: '涂过的地方绿化变稀', blur: '涂过的地方浓淡过渡变软', gradient: '先用选区工具（M）画选区，再在选区里拖一条线：起点淡、终点浓', line: '沿着笔迹每隔几格落一笔：画行道树、树篱' }[GB.mode] || '';
+}
+function greenColors() {
+  const sel = $('o_gcolor'), v = sel.value || (greenActive() || {}).swatch || 'meadow';
+  sel.innerHTML = `<optgroup label="内置">${Object.entries(MCGen.GREEN_SWATCHES).map(([k, s]) => `<option value="${k}">${s.name}</option>`).join('')}</optgroup>`
+    + (GREEN_USER.length ? `<optgroup label="我保存的">${GREEN_USER.map(s => `<option value="u:${s.id}">${s.name.replace(/</g, '&lt;')}</option>`).join('')}</optgroup>` : '');
+  sel.value = [...sel.options].some(o => o.value === v) ? v : 'meadow';
+}
+$('o_gpreset').addEventListener('change', e => { gbLoad(e.target.value); greenBar(); redraw(); });
+for (const [id, f, mn, mx] of [['o_gsize', 'size', 1, 64], ['o_ghard', 'hard', 0, 100], ['o_gop', 'op', 5, 100], ['o_gflow', 'flow', 1, 100], ['gp_spacing', 'spacing', 5, 1000], ['gp_sizeJ', 'sizeJ', 0, 100], ['gp_scatter', 'scatter', 0, 1000], ['gp_count', 'count', 1, 16], ['gp_countJ', 'countJ', 0, 100], ['gp_rough', 'rough', 0, 100], ['gp_gap', 'gap', 2, 40], ['gp_offset', 'offset', 0, 20]])
+  $(id).addEventListener('change', e => { GB[f] = Math.max(mn, Math.min(mx, Math.round(+e.target.value) || mn)); gbSave(); greenBar(); redraw(); });
+$('gp_tip').addEventListener('change', e => { GB.tip = e.target.value; gbSave(); });
+$('gp_both').addEventListener('change', e => { GB.both = e.target.checked; gbSave(); });
+$('gp_air').addEventListener('change', e => { GB.air = e.target.checked; gbSave(); });
+$('o_gmore').addEventListener('click', e => { const P = $('gpop'); P.hidden = !P.hidden; if (!P.hidden) { const r = e.target.getBoundingClientRect(); P.style.left = Math.min(innerWidth - 380, r.left) + 'px'; P.style.top = (r.bottom + 6) + 'px'; $('gp_name').value = GB.preset.startsWith('u:') ? (GB_USER.find(b => 'u:' + b.id === GB.preset) || {}).name || '' : ''; } e.stopPropagation(); });
+addEventListener('pointerdown', e => { if (!$('gpop').hidden && !e.target.closest('#gpop, #o_gmore')) $('gpop').hidden = true; });
+$('gp_save').addEventListener('click', () => {
+  const name = $('gp_name').value.trim(); if (!name) { $('gp_hint').textContent = '先给笔刷起个名字。'; return; }
+  const brush = {}; for (const k of Object.keys(GB_BASE)) if (k !== 'erase') brush[k] = GB[k];
+  let b = GB_USER.find(x => x.name === name); if (b) b.brush = brush; else { b = { id: Date.now().toString(36), name, brush }; GB_USER.push(b); }
+  try { localStorage.setItem(GB_UKEY, JSON.stringify(GB_USER)); } catch (e) { }
+  GB.preset = 'u:' + b.id; gbSave(); greenBar(); $('gp_hint').textContent = `已保存笔刷“${name}”。`;
+});
+$('gp_del').addEventListener('click', () => {
+  if (!GB.preset.startsWith('u:')) { $('gp_hint').textContent = '内置笔刷不能删除。'; return; }
+  GB_USER = GB_USER.filter(b => 'u:' + b.id !== GB.preset); try { localStorage.setItem(GB_UKEY, JSON.stringify(GB_USER)); } catch (e) { }
+  gbLoad('soft'); greenBar(); $('gp_hint').textContent = '已删除。';
+});
+$('o_gerase').addEventListener('change', e => { GB.erase = e.target.value; gbSave(); });
+$('o_gcolor').addEventListener('change', e => { const G = greenState(), L = G.layers.slice().reverse().find(l => l.swatch === e.target.value); if (L) G.active = L.id; greenPanel(); });
+function greenKey(k) { const big = k === '{' || k === '}', up = k === ']' || k === '}';
+  if (big) GB.hard = Math.max(0, Math.min(100, GB.hard + (up ? 10 : -10))); else GB.size = Math.max(1, Math.min(64, GB.size + (up ? (GB.size >= 10 ? 2 : 1) : -(GB.size > 10 ? 2 : 1))));
+  gbSave(); greenBar(); redraw(); }
+$('o_gfill').addEventListener('click', () => {
+  if (!SELD || !SELD.mask || !SELD.mask.count) { $('o_ghint').textContent = '先用选区工具（M）在地面上画一个选区，再回来按“填满选区”。'; return; }
+  const M = SELD.mask, cells = new Map();
+  for (let x = M.x0; x <= M.x1; x++) for (let z = M.z0; z <= M.z1; z++) if (M.has(x, z)) cells.set(x + ',' + z, 1);
+  greenApply(cells, GB.mode === 'erase' || GB.mode === 'thin' ? '清掉了选区里的绿化' : `用“${greenSwatchName($('o_gcolor').value)}”填满了选区（${cells.size} 格）`, GB.mode === 'erase' || GB.mode === 'thin' ? 'erase' : 'paint');
+});
+// ---- stroke ----
+var GSTROKE = null, GCUR = null;
+// one dab of the tip at (cx, cz) with diameter d: adds to the stroke's coverage (0..1) with the brush's flow
+function greenDab(cx, cz, d) {
+  const r = Math.max(0.5, d / 2), h = GB.hard / 100, ri = Math.ceil(r), flow = GB.flow / 100, splat = GB.tip === 'splat';
+  const sd = splat ? Math.random() * 1e6 | 0 : 0, rough = GB.rough / 100;
+  const vn = (x, z, s) => { const fx = x / s, fz = z / s, x0 = Math.floor(fx), z0 = Math.floor(fz), tx = fx - x0, tz = fz - z0, hh = (a, b) => { let q = Math.imul(a ^ sd, 0x27d4eb2d) ^ Math.imul(b, 0x165667b1); q = Math.imul(q ^ (q >>> 15), 0x85ebca6b); return ((q ^ (q >>> 13)) >>> 0) / 4294967296; };
+    const u = tx * tx * (3 - 2 * tx), v = tz * tz * (3 - 2 * tz); return (hh(x0, z0) * (1 - u) + hh(x0 + 1, z0) * u) * (1 - v) + (hh(x0, z0 + 1) * (1 - u) + hh(x0 + 1, z0 + 1) * u) * v; };
+  for (let x = Math.round(cx) - ri; x <= Math.round(cx) + ri; x++) for (let z = Math.round(cz) - ri; z <= Math.round(cz) + ri; z++) {
+    const dd = Math.hypot(x - cx, z - cz); if (dd > r) continue;
+    let f;
+    if (splat) { const n = vn(x, z, Math.max(1.5, r * 0.45)); f = n * rough + (1 - rough) * 0.6 > 0.25 + 0.75 * Math.pow(dd / r, 1.6) ? 1 : 0; if (!f) continue; }
+    else { f = dd <= r * h ? 1 : 1 - (dd - r * h) / Math.max(1e-6, r - r * h); f = f * f * (3 - 2 * f); }
+    const k = x + ',' + z, s = GSTROKE.cells.get(k) || 0, ns = s + (1 - s) * f * flow; if (ns > s) GSTROKE.cells.set(k, ns);
+  }
+}
+// a step along the stroke: Photoshop's scattering / count / size jitter around the point (dirx, dirz = stroke direction)
+function greenStep(x, z, dx, dz) {
+  const n = Math.max(1, GB.count - Math.floor(Math.random() * GB.count * GB.countJ / 100 + 1e-9) + (GB.countJ ? 0 : 0));
+  const len = Math.hypot(dx, dz) || 1, px = -dz / len, pz = dx / len, ux = dx / len, uz = dz / len;
+  for (let i = 0; i < n; i++) {
+    const d = Math.max(1, GB.size * (1 - Math.random() * GB.sizeJ / 100)), sc = GB.scatter / 100 * GB.size;
+    let ox = 0, oz = 0;
+    if (sc) { const a = (Math.random() * 2 - 1) * sc / 2; ox = px * a; oz = pz * a; if (GB.both) { const b = (Math.random() * 2 - 1) * sc / 2; ox += ux * b; oz += uz * b; } }
+    greenDab(x + ox, z + oz, d);
+  }
+}
+function greenDown(e) {
+  if (!model) return false;
+  const h = pickRay(e); if (!h) return true;
+  if (!ensureTown()) return true;
+  GSTROKE = { id: e.pointerId, cells: new Map(), last: [h[0], h[2]], start: [h[0], h[2]], dist: 0, lineDist: 0, side: 0 };
+  GCUR = [h[0], h[2], h[1]];
+  if (GB.mode === 'gradient') { redraw(); return true; }
+  if (GB.mode === 'line') greenLineDab(h[0], h[2], 1, 0); else greenStep(h[0], h[2], 1, 0);
+  if (GB.air) GSTROKE.timer = setInterval(() => { if (GSTROKE && GSTROKE.last) { greenStep(GSTROKE.last[0], GSTROKE.last[1], 1, 0); redraw(); } }, 70);
+  redraw(); return true;
+}
+function greenLineDab(x, z, dx, dz) {                 // 沿线: one dab on the line, or one on each side
+  const len = Math.hypot(dx, dz) || 1, px = -dz / len, pz = dx / len, o = GB.offset;
+  if (!o) greenDab(x, z, GB.size); else { greenDab(x + px * o, z + pz * o, GB.size); greenDab(x - px * o, z - pz * o, GB.size); }
+}
+function greenMove(e) {
+  const h = pickRay(e); GCUR = h ? [h[0], h[2], h[1]] : null;
+  if (GSTROKE && h && GB.mode === 'gradient') GSTROKE.last = [h[0], h[2]];
+  if (GSTROKE && h && GB.mode !== 'gradient') {
+    const [ax, az] = GSTROKE.last, dx = h[0] - ax, dz = h[2] - az, dist = Math.hypot(dx, dz);
+    if (GB.mode === 'line') {
+      // walk the segment; a dab every `gap` cells measured along the stroke
+      let t = 0; while (dist > 0 && GSTROKE.lineDist + (dist - t) >= GB.gap) { t += GB.gap - GSTROKE.lineDist; GSTROKE.lineDist = 0; greenLineDab(ax + dx * t / dist, az + dz * t / dist, dx, dz); }
+      GSTROKE.lineDist += dist - t;
+    } else {
+      const step = Math.max(0.5, GB.size * GB.spacing / 100);
+      let t = 0, acc = GSTROKE.dist; while (dist > 0 && acc + (dist - t) >= step) { t += step - acc; acc = 0; greenStep(ax + dx * t / dist, az + dz * t / dist, dx, dz); }
+      GSTROKE.dist = acc + dist - t;
+    }
+    GSTROKE.last = [h[0], h[2]];
+  }
+  redraw();
+}
+function greenUp() {
+  const st = GSTROKE; GSTROKE = null; if (st && st.timer) clearInterval(st.timer);
+  if (!st) { redraw(); return; }
+  if (GB.mode === 'gradient') { greenGradient(st.start, st.last); return; }
+  if (!st.cells.size) { redraw(); return; }
+  const what = { erase: `橡皮擦：${st.cells.size} 格`, thin: `稀疏化：${st.cells.size} 格`, blur: `模糊：${st.cells.size} 格` }[GB.mode] || `画了“${greenSwatchName($('o_gcolor').value)}”：${st.cells.size} 格`;
+  greenApply(st.cells, what, GB.mode === 'line' ? 'paint' : GB.mode);
+}
+// 渐变: density from 0 at the start to the opacity at the end, over the pending selection
+function greenGradient(a, b) {
+  if (!SELD || !SELD.mask || !SELD.mask.count) { $('o_ghint').textContent = '渐变要先用选区工具（M）画一个选区，再在选区里拖一条线。'; redraw(); return; }
+  const M = SELD.mask, dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz;
+  if (L2 < 4) { $('o_ghint').textContent = '拖得长一点：起点淡、终点浓。'; redraw(); return; }
+  const cells = new Map();
+  for (let x = M.x0; x <= M.x1; x++) for (let z = M.z0; z <= M.z1; z++) if (M.has(x, z)) { const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L2)); cells.set(x + ',' + z, t); }
+  greenApply(cells, `渐变填充选区（${cells.size} 格）`, 'set');
+}
+// paint: the chosen colour's layer goes up by s·opacity and every other layer goes down as much (a colour replaces
+// the one under it); erase: the target layers go down
+function greenApply(cells, what, mode = 'paint') {
+  const G = greenState(), op = GB.op / 100, erase = mode === 'erase' || mode === 'thin';
+  if ((erase || mode === 'blur') && !G.layers.length) { $('o_ghint').textContent = '这里还没有绿化。'; return; }
+  greenPushHist();
+  const L = erase || mode === 'blur' ? null : (greenActive() && greenActive().swatch === $('o_gcolor').value ? greenActive() : greenLayerFor($('o_gcolor').value));
+  const targets = erase ? (GB.erase === 'one' && greenActive() ? [greenActive()] : G.layers) : G.layers;
+  let box = null;
+  const get = (T, x, z) => { const t = T.tiles[(x >> 4) + ',' + (z >> 4)]; return t ? t[(x & 15) + ((z & 15) << 4)] : 0; };
+  const blurred = mode === 'blur' ? new Map() : null;
+  if (blurred) for (const [k, s] of cells) { const [x, z] = k.split(',').map(Number); blurred.set(k, targets.map(T => { let a = 0, n = 0; for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { a += get(T, x + dx, z + dz); n++; } return a / n; })); }
+  for (const [k, s] of cells) {
+    const [x, z] = k.split(',').map(Number); if (x < 0 || z < 0 || (model && (x >= model.W || z >= model.L))) continue;
+    const tk = (x >> 4) + ',' + (z >> 4), i = (x & 15) + ((z & 15) << 4), a = s * op;
+    targets.forEach((T, j) => {
+      let t = T.tiles[tk];
+      if (blurred) { if (!t && !blurred.get(k)[j]) return; if (!t) t = T.tiles[tk] = new Uint8Array(256); t[i] = Math.round(t[i] + (blurred.get(k)[j] - t[i]) * Math.min(1, s * op * 1.5)); return; }
+      if (T === L) { if (!t) t = T.tiles[tk] = new Uint8Array(256); const v = t[i] / 255; t[i] = Math.round(255 * (mode === 'set' ? Math.max(v * (1 - op), s * op) : v + (1 - v) * a)); }
+      else if (t && t[i]) t[i] = Math.round(t[i] * (1 - (mode === 'set' ? s * op : a)));
+    });
+    box = boxU(box, [x, z, x, z]);
+  }
+  for (const T of G.layers) for (const [k, t] of Object.entries(T.tiles)) if (!t.some(v => v)) delete T.tiles[k];
+  greenPanel(); if (box) greenSend(box, what);
+}
+function greenSend(rect, what, tries = 0) {
+  if (!TOWN) return;
+  const t0 = performance.now(), el = $('t_status');
+  if (!TOWN.remote) { greenSync(rect, what); return; }
+  const T0 = TOWN;
+  GW.call('town', 'townGreen', { green: greenArgs(), rect, curH: model ? model.H : 0, ver: TOWN.ver }, true).then(r => {
+    if (!r || TOWN !== T0) return;
+    if (r.stale) { if (tries < 20) setTimeout(() => greenSend(null, what, tries + 1), 300); return; }   // the town was being regenerated: send everything again
+    if (r.boxes) TOWN.boxes = new Map(r.boxes);
+    if (r.model) { showTerrainModel(r.model, TOWN.geo, TOWN.label, [what || '绿化已更新'], el, t0); TOWN.model = TER.result; }
+    else if (r.sub && model && model.H === r.sub.H) { const tp = performance.now(), n = patchSub(r.sub); el.classList.remove('bad'); el.textContent = `完成（后台线程 ${Math.round(tp - t0)} 毫秒；重建 ${n} 个区块）。${what || ''}；绿化共 ${r.n} 个方块。`; }
+    renderSel(); redraw();
+  }).catch(e => { tStatus('绿化失败：' + e.message, true); console.error(e); });
+}
+function greenSync(rect, what) {                    // no worker: the same overlay on the main thread
+  if (!TOWN.cstate || !TOWN.OV || !rect) { recompose(what || '绿化已更新'); return; }
+  const T = TOWN.cstate.T, g = MCGen.greenOverlay(T, greenLayersAll(), rect, TOWN.OV); TOWN.OV = g.ov; TOWN.OVY = g.maxY;
+  if (g.maxY >= model.H) { recompose(what); return; }
+  if (g.clip) MCGen.greenWith(T.S, g.ov, () => patchModel(T.S, g.clip));
+  tStatus(`完成。${what || ''}；绿化共 ${g.ov.size} 个方块。`); renderSel(); redraw();
+}
+// ---- undo ----
+const greenClone = G => ({ active: G.active, nextId: G.nextId, layers: G.layers.map(l => ({ ...l, recipe: JSON.parse(JSON.stringify(l.recipe)), tiles: Object.fromEntries(Object.entries(l.tiles).map(([k, t]) => [k, t.slice()])) })) });
+const greenSnap = () => ({ kind: 'green', g: greenClone(greenState()) });
+function greenPushHist() { HIST.push(greenSnap()); if (HIST.length > 50) HIST.shift(); REDO.length = 0; }
+function greenDiff(A, B) {                          // the box where two greenery states differ
+  let box = null; const ids = new Set([...A.layers, ...B.layers].map(l => l.id));
+  const meta = l => l ? JSON.stringify([l.recipe, l.seed, l.visible]) : '';
+  const order = G => G.layers.map(l => l.id).join(',');
+  for (const id of ids) {
+    const a = A.layers.find(l => l.id === id), b = B.layers.find(l => l.id === id);
+    if (!a || !b || meta(a) !== meta(b) || order(A) !== order(B)) { box = boxU(box, a && greenTileBox(a)); box = boxU(box, b && greenTileBox(b)); continue; }
+    for (const k of new Set([...Object.keys(a.tiles), ...Object.keys(b.tiles)])) {
+      const ta = a.tiles[k], tb = b.tiles[k]; if (ta && tb && ta.every((v, i) => v === tb[i])) continue;
+      const [tx, tz] = k.split(',').map(Number); box = boxU(box, [tx * 16, tz * 16, tx * 16 + 15, tz * 16 + 15]);
+    }
+  }
+  return box;
+}
+function greenRestore(sn) { const before = greenState(); picks.green = greenClone(sn.g); greenPanel(); const box = greenDiff(before, picks.green); if (box) greenSend(box, '撤销 / 重做：绿化已恢复'); }
+// a layer changed as a whole (recipe, seed, visibility, order, removed)
+function greenLayerChanged(before, what) { const box = greenDiff(before, greenState()); greenPanel(); if (box) greenSend(box, what); }
+// ---- layer list ----
+function greenPanel() {
+  if (!$('g_layers')) return;
+  greenColors(); greenBar();
+  const G = greenState(), sws = `<optgroup label="内置">${Object.entries(MCGen.GREEN_SWATCHES).map(([k, s]) => `<option value="${k}">${s.name}</option>`).join('')}</optgroup>` + (GREEN_USER.length ? `<optgroup label="我保存的">${GREEN_USER.map(s => `<option value="u:${s.id}">${s.name.replace(/</g, '&lt;')}</option>`).join('')}</optgroup>` : '');
+  $('g_layers').innerHTML = G.layers.length ? G.layers.slice().reverse().map(L => {
+    let n = 0; for (const t of Object.values(L.tiles)) for (const v of t) if (v) n++;
+    return `<div class="glayer${L.id === G.active ? ' on' : ''}" data-gl="${L.id}"><input type="checkbox" data-gf="visible" ${L.visible !== false ? 'checked' : ''} title="显示 / 隐藏"><input type="text" data-gf="name" value="${String(L.name).replace(/"/g, '&quot;')}" aria-label="图层名"><span>${n} 格</span>`
+      + `<div class="gl2"><select data-gf="swatch" title="这个图层用的绿化颜色（配方）">${sws.replace(`value="${L.swatch}"`, `value="${L.swatch}" selected`)}</select><input type="number" data-gf="seed" value="${L.seed}" title="种子：只换植物的位置，不改范围"><button type="button" data-ga="dice" title="换一个种子">🎲</button><button type="button" data-ga="up" title="上移">↑</button><button type="button" data-ga="down" title="下移">↓</button><button type="button" data-ga="del" title="删除这个图层">删除</button></div></div>`;
+  }).join('') : '<div class="spec-note">还没有绿化。选左边的绿化笔刷（J），在地面上画。</div>';
+}
+$('g_layers').addEventListener('click', e => {
+  const row = e.target.closest('.glayer'); if (!row) return; const G = greenState(), L = G.layers.find(l => l.id === +row.dataset.gl); if (!L) return;
+  const a = e.target.dataset.ga;
+  if (!a) { if (G.active !== L.id && !e.target.matches('input, select')) { G.active = L.id; $('o_gcolor').value = L.swatch; greenPanel(); } return; }
+  greenPushHist(); const before = greenClone(G), i = G.layers.indexOf(L);
+  if (a === 'dice') L.seed = 1 + Math.floor(Math.random() * 99999);
+  else if (a === 'up' && i < G.layers.length - 1) [G.layers[i], G.layers[i + 1]] = [G.layers[i + 1], G.layers[i]];
+  else if (a === 'down' && i > 0) [G.layers[i], G.layers[i - 1]] = [G.layers[i - 1], G.layers[i]];
+  else if (a === 'del') { G.layers.splice(i, 1); if (G.active === L.id) G.active = G.layers.length ? G.layers[G.layers.length - 1].id : null; }
+  greenLayerChanged(before, { dice: '换了绿化种子', up: '图层上移', down: '图层下移', del: `删除了绿化图层“${L.name}”` }[a]);
+});
+$('g_layers').addEventListener('change', e => {
+  const row = e.target.closest('.glayer'); if (!row) return; const G = greenState(), L = G.layers.find(l => l.id === +row.dataset.gl); if (!L) return;
+  const f = e.target.dataset.gf; if (f === 'name') { L.name = e.target.value.slice(0, 24) || L.name; return; }
+  greenPushHist(); const before = greenClone(G);
+  if (f === 'visible') L.visible = e.target.checked;
+  else if (f === 'seed') L.seed = Math.max(1, Math.round(+e.target.value) || 1);
+  else if (f === 'swatch') { L.swatch = e.target.value; L.recipe = MCGen.greenRecipe(greenSwatch(L.swatch) || {}); L.name = greenSwatchName(L.swatch); }
+  greenLayerChanged(before, '绿化图层已修改');
+});
+// a swatch saved again under the same name: layers using it follow
+function greenPalette() {
+  const G = picks.green; if (G) { const before = greenClone(G); let ch = false;
+    for (const L of G.layers) { const r = greenSwatch(L.swatch); if (r && JSON.stringify(MCGen.greenRecipe(r)) !== JSON.stringify(L.recipe)) { L.recipe = MCGen.greenRecipe(r); ch = true; } }
+    if (ch && TOWN) greenLayerChanged(before, '绿化颜色已更新，用它画过的地方一起变了'); }
+  greenPanel();
+}
+// ---- brush cursor and the stroke being drawn ----
+function drawGreenCursor() {
+  if (curMode() !== 'layout' || !model) return;
+  const quad = (x, z, y) => [proj([x, y, z]), proj([x + 1, y, z]), proj([x + 1, y, z + 1]), proj([x, y, z + 1])];
+  if (GSTROKE && GB.mode === 'gradient' && GSTROKE.start && GSTROKE.last) {
+    const y = topY(GSTROKE.start[0], GSTROKE.start[1]) + 1.05, a = proj([GSTROKE.start[0] + .5, y, GSTROKE.start[1] + .5]), b = proj([GSTROKE.last[0] + .5, y, GSTROKE.last[1] + .5]);
+    if (a && b) { gctx.strokeStyle = '#9be07a'; gctx.lineWidth = 3; gctx.beginPath(); gctx.moveTo(a[0], a[1]); gctx.lineTo(b[0], b[1]); gctx.stroke(); gctx.fillStyle = '#fff'; gctx.beginPath(); gctx.arc(a[0], a[1], 4, 0, 7); gctx.fill(); gctx.fillStyle = '#9be07a'; gctx.beginPath(); gctx.arc(b[0], b[1], 6, 0, 7); gctx.fill(); }
+  }
+  if (GSTROKE) {
+    let n = 0;
+    for (const [k, s] of GSTROKE.cells) { if (++n > 6000) break; const [x, z] = k.split(',').map(Number); if (x < 0 || z < 0 || x >= model.W || z >= model.L) continue;
+      const P = quad(x, z, topY(x, z) + 1.02); if (P.some(p => !p)) continue;
+      gctx.beginPath(); P.forEach((p, i) => i ? gctx.lineTo(p[0], p[1]) : gctx.moveTo(p[0], p[1])); gctx.closePath();
+      gctx.fillStyle = GB.mode === 'erase' || GB.mode === 'thin' ? `rgba(230,90,70,${0.15 + 0.4 * s})` : GB.mode === 'blur' ? `rgba(120,170,230,${0.15 + 0.4 * s})` : `rgba(120,210,90,${0.15 + 0.45 * s})`; gctx.fill(); }
+  }
+  if (!GCUR) return;
+  const [cx, cz, cy] = GCUR, r = Math.max(0.5, GB.size / 2), ring = (rr, dash) => { const P = []; for (let i = 0; i <= 48; i++) { const a = i / 48 * Math.PI * 2, p = proj([cx + 0.5 + Math.cos(a) * rr, cy + 1.05, cz + 0.5 + Math.sin(a) * rr]); if (p) P.push(p); }
+    gctx.beginPath(); P.forEach((p, i) => i ? gctx.lineTo(p[0], p[1]) : gctx.moveTo(p[0], p[1])); gctx.setLineDash(dash); gctx.stroke(); gctx.setLineDash([]); };
+  if (GB.mode === 'gradient') { gctx.fillStyle = '#9be07a'; const p = proj([cx + .5, cy + 1.05, cz + .5]); if (p) { gctx.beginPath(); gctx.arc(p[0], p[1], 4, 0, 7); gctx.fill(); } return; }
+  gctx.lineWidth = 2; gctx.strokeStyle = GB.mode === 'erase' || GB.mode === 'thin' ? '#ff8a6a' : GB.mode === 'blur' ? '#8ab8ff' : '#9be07a'; ring(r, []);
+  if (GB.mode === 'line' && GB.offset) { gctx.lineWidth = 1; gctx.strokeStyle = 'rgba(255,255,255,.6)'; ring(GB.offset, [4, 3]); }
+  if (GB.tip !== 'splat' && GB.hard < 100 && r > 1) { gctx.lineWidth = 1; gctx.strokeStyle = 'rgba(255,255,255,.6)'; ring(r * GB.hard / 100, [4, 3]); }
+}
+// ---- save / open ----
+function greenSave() { const G = picks.green; if (!G || !G.layers.length) return null; return { v: 1, active: G.active, nextId: G.nextId, layers: G.layers.map(l => ({ id: l.id, name: l.name, swatch: l.swatch, recipe: l.recipe, seed: l.seed, visible: l.visible !== false, tiles: Object.fromEntries(Object.entries(l.tiles).map(([k, t]) => [k, b64e(t)])) })) }; }
+function greenLoadProject(g) {
+  picks.green = null;
+  if (g && Array.isArray(g.layers)) picks.green = { active: g.active, nextId: g.nextId || g.layers.length + 1, layers: g.layers.map(l => ({ id: l.id, name: l.name || greenSwatchName(l.swatch), swatch: l.swatch, recipe: MCGen.greenRecipe(l.recipe), seed: l.seed || 1, visible: l.visible !== false, tiles: Object.fromEntries(Object.entries(l.tiles || {}).map(([k, t]) => [k, b64d(t)]).filter(([, t]) => t.length === 256)) })) };
+  greenPanel();
+}
+greenPanel();
 // ====================== item editor: the selected house / prop's own settings, applied live ======================
 let edFor = null, edTimer = 0, edPushed = false;
 const optsOf = id => $(id) ? $(id).innerHTML : '';

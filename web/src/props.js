@@ -350,9 +350,11 @@ function placeProp(W, prop, x, y, z, q = 0, opts = {}) {
 // ---- placement checks: things that break or change once pasted into the game -------------------
 const SOIL = /(grass_block|dirt|podzol|coarse_dirt|rooted_dirt|farmland|moss_block|mud\b|mycelium)/;
 const GRAVITY = /^minecraft:(sand|red_sand|gravel|suspicious_\w+|\w+_concrete_powder|anvil|chipped_anvil|damaged_anvil|scaffolding|pointed_dripstone)\b/;
-const PLANT = /^minecraft:(short_grass|tall_grass|fern|large_fern|poppy|dandelion|cornflower|\w+_tulip|allium|azure_bluet|oxeye_daisy|lily_of_the_valley|blue_orchid|rose_bush|lilac|peony|sunflower|\w+_sapling|sweet_berry_bush|wildflowers|pink_petals)\b/;
+const PLANT = /^minecraft:(short_grass|tall_grass|fern|large_fern|poppy|dandelion|cornflower|\w+_tulip|allium|azure_bluet|oxeye_daisy|lily_of_the_valley|blue_orchid|rose_bush|lilac|peony|sunflower|\w+_sapling|sweet_berry_bush|wildflowers|pink_petals|bush|firefly_bush)\b/;
+const DRY_PLANT = /^minecraft:(short_dry_grass|tall_dry_grass|dead_bush)\b/, DRY_SOIL = /(sand|terracotta|dirt|podzol|mud\b|grass_block|moss_block)/;
+const TALL_PLANT = /^minecraft:(tall_grass|large_fern|rose_bush|lilac|peony|sunflower|pitcher_plant|small_dripleaf)\[/;
 function checkPlacement(S, only) {
-  const issues = { leaves: 0, lantern: 0, plant: 0, gravity: 0, water: 0, door: 0 }, where = {};
+  const issues = { leaves: 0, lantern: 0, plant: 0, gravity: 0, water: 0, door: 0, tall: 0 }, where = {};
   const note = (k, key) => { issues[k]++; (where[k] = where[k] || []).length < 5 && where[k].push(key); };
   const get = (x, y, z) => S.blocks.get(key3(x, y, z));
   const keys = only ? [...only] : [...S.blocks.keys()];
@@ -362,6 +364,8 @@ function checkPlacement(S, only) {
     if (st.includes('_leaves[') && st.includes('persistent=false')) note('leaves', k);
     if (/lantern\[/.test(st)) { if (st.includes('hanging=true') ? isAir(above) : isAir(below)) note('lantern', k); }
     if (PLANT.test(st) && !st.includes(':potted_') && !(below && SOIL.test(below)) && !(st.includes('half=upper'))) note('plant', k);
+    if (DRY_PLANT.test(st) && !(below && DRY_SOIL.test(below))) note('plant', k);
+    if (TALL_PLANT.test(st)) { const up = st.includes('half=lower'), o = get(x, y + (up ? 1 : -1), z); if (!o || o.split('[')[0] !== st.split('[')[0] || o.includes(up ? 'half=lower' : 'half=upper')) note('tall', k); }
     if (GRAVITY.test(st) && (isAir(below) || isWater(below))) note('gravity', k);
     if (isWater(st)) for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0]]) if (isAir(get(x + dx, y + dy, z + dz))) { note('water', k); break; }
     if (/_door\[/.test(st)) { const up = st.includes('half=lower'); const o = get(x, y + (up ? 1 : -1), z); if (!o || !/_door\[/.test(o)) note('door', k); }
