@@ -61,7 +61,8 @@ function solve(spec) {
   if (PITCHLESS.has(style)) { reqPitch = s.roof_pitch = 'normal'; pitchOpts = ['normal']; }
   else pitchOpts = reqPitch === 'auto' ? PITCHES : [reqPitch, ...PITCHES.filter(p => p !== reqPitch)];
   const uniqSorted = a => [...new Set(a)].sort((x, y) => x - y);
-  const floorsOpts = uniqSorted([0, 1, -1, 2].map(d => Math.max(1, Math.min(3, s.floors + d))));
+  // Keep the requested floor count; correct the remaining proportions around it.
+  const floorsOpts = [s.floors];
   const fhOpts = uniqSorted([s.floor_height, 4, 5]);
   const flareOpts = [s.flared_eave, !s.flared_eave], jettyOpts = [s.jetty, !s.jetty];
   let best = null;

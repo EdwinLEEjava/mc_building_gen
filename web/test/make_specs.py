@@ -29,5 +29,11 @@ for i in range(260):
                     c[slot] = R.choice([hx, '红', '深棕', '米白', '偏蓝色'])
         sp['colors'] = c
     specs.append(sp)
+# Higher floor requests participate in the Python/JavaScript block comparison.
+for floors in (4, 5):
+    for floor_height in (3, 5):
+        for plan in ('rect', 'L'):
+            specs.append(dict(width=15, depth=9, floors=floors, floor_height=floor_height,
+                              plan=plan, seed=5, jetty=True))
 json.dump(specs, open('web/test/specs.json', 'w'), ensure_ascii=False)
 print(len(specs))
