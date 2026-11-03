@@ -3411,6 +3411,592 @@ function church(o = {}) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Gothic facades (精细立面). A face has its own frame: u across, v up (= y), d depth: 0 = the wall plane,
+// + outward, - inward. Every cell (u, v) has a front-surface depth D(u, v) and a role (frame / infill / niche /
+// door / glass / void). A cell is filled from its own depth back to the deepest of its neighbours (so recesses
+// get side walls), then edges are moulded automatically: the top edge of anything standing proud becomes a
+// sloped stair (weathering), the underside an upside-down stair (arch rims, cornices). Fixed parts go on last:
+// statues, pinnacles, crockets, finials. The same kit builds the west front and the towers' outer sides.
+// Layout follows the cathedral: the centre strip is the nave, the tower strips stand over the aisles, with a
+// buttress pier between them and one outside each tower. Storey heights come from the strip widths, so any
+// nave / aisle width gives a consistent front; parts that do not fit shrink (fewer arch orders) or drop.
+// gothicFrontLayout(...) runs first so the cathedral can raise its towers to the facade's tower top.
+// ---------------------------------------------------------------------------------------------
+function gothicArchIn(du, v, w, v0, hs) {           // inside a pointed (equilateral) arch: width w, springing at hs
+  const a = w / 2, x = Math.abs(du);
+  if (x > a - 0.5 || v < v0) return false;
+  if (v <= hs) return true;
+  return v + 0.5 <= hs + Math.sqrt(Math.max(0, w * w - (x + a) * (x + a))) + 0.35;
+}
+const gothicArchTop = (w, hs) => hs + Math.floor(Math.sqrt(3) * w / 2);
+// facade materials per wall style (frame, stairs, slab, wall post, statue head, capital, niche back)
+const GOTHIC_FACADE_MATS = {
+  white: { frame: 'polished_diorite', stairs: 'polished_diorite_stairs', slab: 'polished_diorite_slab', wall: 'diorite_wall', head: 'calcite', capital: 'chiseled_stone_bricks', niche: 'smooth_stone' },
+  stone: { frame: 'stone_bricks', stairs: 'stone_brick_stairs', slab: 'stone_brick_slab', wall: 'stone_brick_wall', head: 'polished_andesite', capital: 'chiseled_stone_bricks', niche: 'cracked_stone_bricks' },
+  rough: { frame: 'stone_bricks', stairs: 'stone_brick_stairs', slab: 'stone_brick_slab', wall: 'cobblestone_wall', head: 'polished_andesite', capital: 'chiseled_stone_bricks', niche: 'mossy_cobblestone' },
+  sandstone: { frame: 'smooth_sandstone', stairs: 'smooth_sandstone_stairs', slab: 'smooth_sandstone_slab', wall: 'sandstone_wall', head: 'chiseled_sandstone', capital: 'chiseled_sandstone', niche: 'sandstone' },
+  marble: { frame: 'quartz_block', stairs: 'quartz_stairs', slab: 'quartz_slab', wall: 'diorite_wall', head: 'calcite', capital: 'chiseled_quartz_block', niche: 'smooth_quartz' },
+  warm: { frame: 'cut_sandstone', stairs: 'sandstone_stairs', slab: 'cut_sandstone_slab', wall: 'sandstone_wall', head: 'chiseled_sandstone', capital: 'chiseled_sandstone', niche: 'smooth_sandstone' },
+  dark: { frame: 'polished_deepslate', stairs: 'polished_deepslate_stairs', slab: 'polished_deepslate_slab', wall: 'polished_deepslate_wall', head: 'deepslate_tiles', capital: 'chiseled_deepslate', niche: 'deepslate_tiles' },
+};
+function gothicFrontLayout({ hw, edge, NT, ridge, TT }) {
+  const cw = hw, b1 = hw + 1, b2 = edge + 1, t0 = hw + 4, t1 = edge, th = (t1 - t0) >> 1, tc = t0 + th, U = edge + 3;
+  const odd = n => n | 1;
+  const wc = odd(2 * cw - 1), oc = Math.max(1, Math.min(6, (wc - 5) >> 1)), hc = Math.max(5, Math.round(wc * 0.6));
+  const ws = odd(Math.max(5, 2 * th - 1)), os = Math.max(1, Math.min(4, (ws - 3) >> 1)), hsS = Math.max(4, Math.round(ws * 0.8));
+  const H_PORT = Math.max(gothicArchTop(wc, hc), gothicArchTop(ws, hsS)) - 2;
+  const H_GAL = H_PORT + 6, Rr = Math.max(2, cw - 2.4), vc = Math.round(H_GAL + Rr + 4), H_ROSE = Math.round(vc + Rr + 3);
+  const H_KING = H_ROSE + 9, gh = Math.round((cw + 0.5) * 1.35), gBase = Math.max(H_KING, ridge + 2 - gh);
+  const top = Math.max(TT, gBase + gh + 16, H_KING + 30);
+  return { cw, b1, b2, t0, t1, th, tc, U, wc, oc, hc, ws, os, hsS, H_PORT, H_GAL, Rr, vc, H_ROSE, H_KING, gh, gBase, top };
+}
+// the kit: one face. W(u, v, d) -> [x, y, z]; dir = world facings for inward / outward / -u / +u; ax = pane axis
+function gothicKit(S, o, W, dir, ax, mine) {
+  const FST = o.stairs;
+  const st = (m, f, half = 'bottom') => B(m, { facing: f, half, shape: 'straight', waterlogged: false });
+  const post = () => B(o.wall, { east: 'none', north: 'none', south: 'none', up: true, waterlogged: false, west: 'none' });
+  const rod = () => B('end_rod', { facing: 'up' });
+  const put = (u, v, d, s) => { const [x, y, z] = W(u, v, d); S.set(x, y, z, s); mine.add(x + ',' + y + ',' + z); };
+  const D = new Map(), R = new Map(), HOLE = new Map(), LOCK = new Set(), ATT = [];
+  const k2 = (u, v) => u + ',' + v;
+  const getD = (u, v) => D.get(k2(u, v));
+  const setD = (u, v, d, role, lock) => { const k = k2(u, v); if (LOCK.has(k) && !lock) return; D.set(k, d); R.set(k, role); if (lock) LOCK.add(k); };
+  const K = { st, post, rod, put, D, R, HOLE, ATT, k2, getD, setD, FST, dir, statues: 0, pins: 0 };
+  K.statue = (u, v, d) => { if (o.statues === false) return; put(u, v, d, post()); put(u, v + 1, d, post()); put(u, v + 2, d, B(o.head)); K.statues++; };
+  K.fill = () => {
+    for (const [k, d] of D) {
+      const [u, v] = k.split(',').map(Number), role = R.get(k), hole = HOLE.get(k);
+      if (hole === 'void') { for (let dd = Math.max(d, 1); dd >= -5; dd--) put(u, v, dd, 'minecraft:air'); continue; }   // open right through (also through the tower wall behind)
+      if (o.clear !== false) for (let dd = d + 1; dd <= d + 6; dd++) { const [x, y, z] = W(u, v, dd); if (S.has(x, y, z)) S.set(x, y, z, null); }   // clear what the building left in front of this cell (roof ends, old walls)
+      let back = Math.min(d - (o.thick ?? 2), o.backMax ?? -3);
+      for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = getD(u + a, v + b); if (n !== undefined && n < back) back = n; }
+      for (let dd = back; dd <= d; dd++) {
+        let s;
+        if (hole === 'glass') { if (dd === d) s = o.pane(...W(u, v, dd), ax); else if (dd === d - 1) s = B(o.dark || 'gray_concrete'); else continue; }   // pane, a dark block right behind it (reads as a window, stays joined)
+        else if (hole === 'door') s = dd === d ? B(o.door) : B(o.doorBack);
+        else s = role === 'infill' ? o.infill(...W(u, v, dd)) : role === 'niche' ? B(o.niche) : role === 'checker' ? B(((u + v) & 1) ? o.checkA || o.frame : o.checkB || o.niche) : B(o.frame);
+        put(u, v, dd, s);
+      }
+    }
+    for (const [k, d] of D) {                         // automatic mouldings
+      const [u, v] = k.split(',').map(Number); if (HOLE.has(k)) continue;
+      const up = getD(u, v + 1), dn = getD(u, v - 1);
+      if (up === undefined || up < d) { if (!HOLE.has(k2(u, v + 1))) put(u, v, d, st(FST, dir.in)); }
+      else if (v > 1 && dn !== undefined && dn < d && !HOLE.has(k2(u, v - 1))) put(u, v, d, st(FST, dir.in, 'top'));
+    }
+  };
+  K.courses = (rows, us, skip) => { for (const v of rows) for (const u of us) {   // string courses, open parapets on the listed rows
+    const d = getD(u, v); if (d === undefined || skip(u) || HOLE.has(k2(u, v))) continue;
+    put(u, v, d + 1, st(FST, dir.in, 'top'));
+    if (rows.parapet.includes(v)) put(u, v + 1, d + 1, Math.abs(u) % 2 ? post() : B(o.slab, { type: 'bottom', waterlogged: false }));
+  } };
+  K.pinnacle = (u, v, d, h, big) => {                // square shaft (pierced) -> corner pinnacles + stair cap -> needle with crockets -> finial
+    if (o.pinnacles === false) return;
+    // it must stand on something: under every cell of its foot, carry a stone column down to the nearest block (at most
+    // 6); a big one that cannot be carried becomes a small one; a small one that cannot is left out
+    const solidAt = (a, y, b) => { const t = S.get(...W(u + a, y, d + b)); return !!t && t !== 'minecraft:air' && !/_slab\[.*type=bottom/.test(t); };   // a bottom slab is only half a block: it leaves a gap
+    const footOk = rr => { for (let a = -rr; a <= rr; a++) for (let b = -rr; b <= rr; b++) { let y = v - 1, k = 0; while (k < 7 && !solidAt(a, y, b)) { y--; k++; } if (k >= 7) return false; } return true; };
+    if (big && !footOk(1)) big = false;
+    if (!big && !footOk(0)) return;
+    { const rr = big ? 1 : 0; for (let a = -rr; a <= rr; a++) for (let b = -rr; b <= rr; b++) for (let y = v - 1; !solidAt(a, y, b); y--) put(u + a, y, d + b, B(o.frame)); }
+    const r = big ? 1 : 0; K.pins++;
+    for (let y = 0; y < h; y++) for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++) {
+      const open = r && (!a !== !b) && y >= 1 && y <= h - 2 && h >= 4;
+      put(u + a, v + y, d + b, open ? 'minecraft:air' : B(o.frame));
+    }
+    let y = v + h;
+    const fac = (a, b) => b > 0 ? dir.in : b < 0 ? dir.out : a > 0 ? dir.un : dir.up;
+    if (r) {
+      for (const [a, b] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { put(u + a, y, d + b, post()); put(u + a, y + 1, d + b, rod()); }
+      for (const [a, b] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) put(u + a, y, d + b, st(FST, fac(a, b)));
+      put(u, y, d, B(o.frame)); y++;
+    }
+    const n = big ? 5 : 2;
+    for (let i = 0; i < n; i++) put(u, y + i, d, big && i === 0 ? B(o.frame) : post());
+    put(u, y + n, d, rod());
+  };
+  K.lancet = (uc, w, v0, hs, orders, base, vMax = Infinity, free = false) => {   // free: the gablet may rise above the wall (into the eaves)     // paired lancets under an oculus, splayed reveals, a gablet on top
+    const IN = gothicArchIn, AT = gothicArchTop;
+    for (let v = v0; v <= AT(w, hs) + 1; v++) for (let du = -(w >> 1); du <= w >> 1; du++) for (let k = 0; k <= orders; k++) if (IN(du, v, w - 2 * k, v0, hs)) setD(uc + du, v, base - 1 - k, 'frame');
+    const iw = w - 2 * orders, dIn = base - 1 - orders, ia = iw >> 1;
+    for (let v = v0; v <= AT(iw, hs); v++) for (let du = -ia; du <= ia; du++) {
+      if (!IN(du, v, iw, v0, hs)) continue;
+      const two = ia >= 2, sub = du < 0 ? -1 : 1, sd = du - sub * (ia + 1) / 2;
+      const inSub = two ? (ia >= 4 ? du !== 0 && IN(sd, v, ia, v0 + 1, hs - 3) : v >= v0 + 1 && (du !== 0 || v > hs + ia)) : v <= hs;   // with no room for an oculus: Y-tracery, one mullion that stops below the head
+      const rr = Math.hypot(du, v - (hs + 4)), oc = ia >= 4 && rr >= 1.6 && rr <= 3.2;   // an oculus only where a real ring fits (glass ring round a stone hub; smaller ones read as a cross)
+      if (inSub || oc) { setD(uc + du, v, dIn - 1, 'glass'); HOLE.set(k2(uc + du, v), 'glass'); }
+    }
+    const gb = AT(w, hs) - 1, a = w >> 1;
+    for (let v = gb; v <= Math.min(gb + a + 2, vMax); v++) for (let du = -a; du <= a; du++) if (v <= gb + a + 2 - Math.round(Math.abs(du) * (a + 2) / a) && (free || getD(uc + du, v) !== undefined) && !HOLE.has(k2(uc + du, v))) setD(uc + du, v, Math.max(getD(uc + du, v) ?? base + 1, base + 1), 'frame');
+    if (gb + a + 4 <= vMax) ATT.push(() => { put(uc, gb + a + 3, base + 1, post()); put(uc, gb + a + 4, base + 1, rod()); });
+  };
+  K.portal = (uc, w, hs, orders, base, isBut, vMax = Infinity) => {   // vMax: the gable and its finial stay below this row
+    const a = w >> 1, top = gothicArchTop(w, hs), gTop = Math.max(top + 1, Math.min(top + a + 6, vMax - 3));
+    for (let v = 0; v <= gTop; v++) for (let du = -a - 1; du <= a + 1; du++) {
+      const u = uc + du, au = Math.abs(du);
+      if (isBut(Math.abs(u), u)) continue;
+      const inGable = v >= hs && v <= gTop - Math.round(au * (gTop - hs) / (a + 1));
+      if (gothicArchIn(du, v, w + 2, 0, hs) || inGable) setD(u, v, base, 'frame', inGable && v > top);
+      for (let k = 0; k <= orders; k++) if (gothicArchIn(du, v, w - 2 * k, 0, hs)) setD(u, v, base - 1 - k, k === orders ? 'infill' : 'frame');
+    }
+    const iw = w - 2 * orders, ia = iw >> 1, dIn = base - 1 - orders;
+    for (let v = 1; v <= hs - 1; v++) for (let du = -ia + 1; du <= ia - 1; du++) {
+      if (du === 0 && ia >= 2) setD(uc, v, dIn + 1, 'frame'); else { setD(uc + du, v, dIn, 'door'); HOLE.set(k2(uc + du, v), 'door'); }
+    }
+    if (ia >= 2) { const tc2 = hs + Math.floor((gothicArchTop(iw, hs) - hs) / 2); for (let du = -2; du <= 2; du++) for (let dv = -2; dv <= 2; dv++) { const r = Math.hypot(du, dv); if ((r <= 2.3 && r > 1.2) || r < 0.5) setD(uc + du, tc2 + dv, dIn + 1, 'frame'); } }
+    ATT.push(() => {
+      for (let k = 0; k < orders; k++) for (const s of [-1, 1]) {      // jamb shafts with capitals
+        const u = uc + s * (((w - 2 * k) / 2 - 0.5) | 0), d = base - 1 - k;
+        for (let v = 1; v < hs - 1; v++) put(u, v, d, post());
+        put(u, hs - 1, d, B(o.capital)); if (k % 2 === 0 && hs > 6) put(u, 5, d, B(o.head));
+      }
+      for (let du = -a - 1; du <= a + 1; du++) {                        // crockets up the gable, finial on top
+        const au = Math.abs(du), v = gTop - Math.round(au * (gTop - hs) / (a + 1));
+        if (au % 2 === 1 && au <= a) put(uc + du, v + 1, base, st(FST, du < 0 ? dir.up : dir.un));
+      }
+      put(uc, gTop + 1, base, post()); put(uc, gTop + 2, base, post()); put(uc, gTop + 3, base, rod());
+    });
+    if (a >= 4 && top + 5 <= gTop) for (let du = -1; du <= 1; du++) for (let dv = -1; dv <= 1; dv++) if (Math.abs(du) + Math.abs(dv) <= 1) setD(uc + du, top + 3 + dv, base - 1, du || dv ? 'niche' : 'frame', true);
+  };
+  K.belfry = (uc, wb, ob, v0, hs, skip) => {         // tall open belfry lancet with reveals
+    const IN = gothicArchIn, AT = gothicArchTop, wo = wb + 2 * ob;
+    for (let v = v0; v <= AT(wo, hs); v++) for (let du = -(wo >> 1); du <= wo >> 1; du++) for (let k = 0; k <= ob; k++) if (IN(du, v, wo - 2 * k, v0, hs) && !skip(uc + du)) setD(uc + du, v, -1 - k, 'frame');
+    for (let v = v0 + 1; v <= AT(wb, hs); v++) for (let du = -(wb >> 1); du <= wb >> 1; du++) if (IN(du, v, wb, v0 + 1, hs) && (du !== 0 || wb < 5)) HOLE.set(k2(uc + du, v), 'void');
+  };
+  K.panels = (us, v0, v1, skip) => {               // blind tracery: narrow recessed upright strips on plain wall, a band every 9 rows
+    for (let v = v0; v <= v1; v++) for (const u of us) {
+      if (skip(u) || (v - v0) % 9 === 0 || ((u % 2) + 2) % 2) continue;
+      const k = k2(u, v), d = D.get(k);
+      if (d === undefined || R.get(k) !== 'infill' || HOLE.has(k) || getD(u - 1, v) !== d || getD(u + 1, v) !== d) continue;
+      setD(u, v, d - 1, 'niche');
+    }
+  };
+  K.kings = (v0, v1, us, base, skip) => {            // a row of statue niches
+    if (o.kings === false) return;
+    for (let v = v0 + 1; v <= v1 - 1; v++) for (const u of us) {
+      if (skip(u)) continue; const au = Math.abs(u);
+      if (v >= v0 + 2 && v <= v0 + 5 && au % 3 !== 0) { setD(u, v, base(u) - 1, 'niche'); if (au % 3 === 1 && v === v0 + 2) ATT.push(() => K.statue(u, v, base(u) - 1)); }
+      else if (v === v0 + 6 && au % 3 === 2) setD(u, v, base(u) - 1, 'niche');
+    }
+  };
+  return K;
+}
+const GOTHIC_FRONT_DIR = { in: 'east', out: 'west', un: 'north', up: 'south' };
+function gothicFront(S, L, o) {
+  const { cw, b1, b2, th, tc, U, H_PORT, H_GAL, H_ROSE, H_KING, gh, gBase, top: H_TOWER } = L;
+  const mine = new Set();
+  const K = gothicKit(S, o, (u, v, d) => [-d, v, u], GOTHIC_FRONT_DIR, 'z', mine);
+  const { st, post, rod, put, HOLE, ATT, k2, getD, setD, FST } = K;
+  const sym = f => { for (let u = -U; u <= U; u++) f(u, Math.abs(u)); };
+  const us = []; for (let u = -U; u <= U; u++) us.push(u);
+  const isBut = au => (au >= b1 && au <= b1 + 2) || (au >= b2 && au <= b2 + 2);
+  const butMid = [b1 + 1, b2 + 1];
+  const butD = v => v <= H_PORT ? 5 : v <= H_ROSE ? 4 : v < H_KING ? 3 : 2;
+  const inTower = au => au > cw;
+  const base0 = au => inTower(au) ? 0 : -1;
+  const AT = gothicArchTop, IN = gothicArchIn;
+
+  // 1. wall planes and buttress piers (each stage steps back one block)
+  for (let v = 0; v <= H_TOWER; v++) sym((u, au) => {
+    if (v >= H_KING && !inTower(au)) return;
+    if (isBut(au)) setD(u, v, butD(v), 'frame'); else setD(u, v, base0(au), 'infill');
+  });
+  // 2. portals: arch rim standing proud, orders stepping in, doors, a steep gable (locked so later storeys keep it)
+  const portal = (uc, w, hs, orders, base) => K.portal(uc, w, hs, orders, base, isBut, H_GAL);   // gables end under the gallery, clear of the rose
+  const capO = n => Math.max(1, Math.min(n, o.orders || 6));
+  portal(0, L.wc, L.hc, capO(L.oc), 2);
+  for (const s of [-1, 1]) portal(s * tc, L.ws, L.hsS, capO(L.os), 2);
+  // 3. blind arcade with statues over the portals
+  for (let v = H_PORT + 1; v <= H_GAL; v++) sym((u, au) => {
+    if (isBut(au) || getD(u, v) > 0) return;
+    const base = base0(au), m = (au + 1) % 4;
+    if (v >= H_PORT + 2 && v <= H_GAL - 1 && m !== 0 && (v < H_GAL - 1 || m === 2)) { setD(u, v, base - 1, 'niche'); if (m === 2 && v === H_PORT + 2) ATT.push(() => K.statue(u, v, base - 1)); }
+  });
+  // 4. rose storey: rose in a deep pointed frame between the towers; paired lancets with a gablet on each tower
+  {
+    const w = 2 * cw + 1, v0 = H_GAL + 1, Rr = L.Rr, Ri = Math.ceil(Rr) + 1;
+    const hs = o.rose === false ? Math.max(v0 + 5, H_ROSE - 1 - Math.floor(Math.sqrt(3) * (w - 4) / 2)) : L.vc - 2;   // without a rose the frame (and its window) fills the whole storey
+    for (let v = v0; v <= H_ROSE; v++) for (let du = -cw; du <= cw; du++) for (let k = 0; k < 3; k++) if (IN(du, v, w - 2 * k, v0, hs)) setD(du, v, -2 - k, k === 2 ? 'infill' : 'frame');
+    const spokes = Rr >= 5 ? 12 : Rr >= 3.5 ? 8 : 6;
+    if (o.rose === false) K.lancet(0, Math.min(2 * cw - 3, 11) | 1, v0 + 1, hs, 2, -2, H_ROSE);   // no rose: a tall traceried window instead
+    else for (let du = -Ri; du <= Ri; du++) for (let dv = -Ri; dv <= Ri; dv++) {
+      const r = Math.hypot(du, dv); if (r > Rr + 0.5) continue;
+      const ang = Math.atan2(dv, du), sp = Math.abs((((ang / (2 * Math.PI / spokes)) % 1) + 1) % 1 - 0.5);
+      const solid = r < 1.3 || (Rr >= 4 && r > Rr * 0.48 && r < Rr * 0.48 + 1) || r > Rr - 0.5 || (sp > 0.42 && r > 1.3);
+      if (solid) setD(du, L.vc + dv, -4, 'frame'); else { setD(du, L.vc + dv, -5, 'glass'); HOLE.set(k2(du, L.vc + dv), 'glass'); }
+    }
+  }
+  const wl = Math.max(3, Math.min(9, (2 * th - 1) | 1));
+  for (const s of [-1, 1]) K.lancet(s * tc, wl, H_GAL + 2, H_ROSE - 8, wl >= 7 ? 2 : 1, 0, H_ROSE);
+  // 5. gallery of kings
+  K.kings(H_ROSE, H_KING, us, u => base0(Math.abs(u)), u => isBut(Math.abs(u)));
+  // 6. above: a gable between the towers (high enough to hide the nave roof), belfry openings on the towers
+  for (let v = H_KING; v <= gBase + gh; v++) for (let u = -cw; u <= cw; u++) if (v <= gBase || v - gBase <= Math.round((cw + 0.5 - Math.abs(u)) * gh / (cw + 0.5))) setD(u, v, -1, 'infill');
+  for (let v = H_KING + 1; v <= gBase - 1; v++) for (let u = -cw + 1; u <= cw - 1; u++) if ((u + cw) % 3 !== 0 && v <= gBase - 2) setD(u, v, -2, 'niche');   // blind arcade under the gable
+  ATT.push(() => { for (let u = -cw; u <= cw; u++) if (Math.abs(u) % 2 === 1) { const v = gBase + Math.round((cw + 0.5 - Math.abs(u)) * gh / (cw + 0.5)); put(u, v + 1, -1, st(FST, u < 0 ? 'south' : 'north')); } });   // crockets up the gable
+  const gr = Math.max(1.5, Math.min(3.3, cw / 3)), gvc = gBase + Math.round(gh * 0.4);
+  for (let du = -5; du <= 5; du++) for (let dv = -5; dv <= 5; dv++) { const r = Math.hypot(du, dv); if (r <= gr + 1) { if (r > gr || r < 1) setD(du, gvc + dv, -2, 'frame'); else { setD(du, gvc + dv, -3, 'glass'); HOLE.set(k2(du, gvc + dv), 'glass'); } } }   // a glass ring round a stone hub (a small filled disc reads as a cross)
+  const bel = th >= 6 ? [tc - 3, tc + 3] : [tc];
+  const wb = th >= 6 ? 5 : Math.max(3, Math.min(5, (2 * th - 3) | 1)), ob = 2 * th + 1 - wb >= 4 ? 2 : 1;
+  for (const s of [-1, 1]) for (const uc of bel) K.belfry(s * uc, wb, ob, H_KING + 3, H_TOWER - 10, u => isBut(Math.abs(u)));
+  for (let v = H_KING + 1; v <= H_TOWER - 1; v++) for (const s of [-1, 1]) for (const au of [cw + 4, L.t1]) if (getD(s * au, v) === 0) setD(s * au, v, 1, 'frame');   // corner shafts
+  if (o.forest) K.panels(us, H_PORT + 2, H_TOWER - 2, u => isBut(Math.abs(u)));
+  // 7. fill, mouldings, string courses, fixed parts
+  K.fill();
+  const rows = [H_PORT + 1, H_GAL, H_ROSE + 1, H_KING - 1, H_TOWER]; rows.parapet = [H_GAL, H_KING - 1, H_TOWER];
+  K.courses(rows, us, u => isBut(Math.abs(u)));
+  for (const f of ATT) f();
+  // 8. pinnacles: on every buttress set-back, a big one on each buttress top, a cluster on each tower
+  sym((u, au) => {
+    if (!butMid.includes(au)) return;
+    for (const [v0, v1] of [[2, H_PORT - 2], [H_PORT + 3, H_ROSE - 3], [H_KING + 2, H_TOWER - 4]]) for (let v = v0 + 2; v + 4 < v1; v += 10) {
+      const d = butD(v); for (let y = v; y < v + 4; y++) put(u, y, d, 'minecraft:air'); K.statue(u, v, d - 1); put(u, v + 4, d, st(FST, 'east', 'top'));
+    }
+    for (const v of [H_PORT + 1, H_ROSE + 1, H_KING]) { const d = butD(v) + 1; if (getD(u, v - 1) === d) { K.pinnacle(u - Math.sign(u), v, d, 2, false); K.pinnacle(u + Math.sign(u), v, d, 2, false); } }
+    K.pinnacle(u, H_TOWER + 1, 0, 5, true);
+  });
+  if (o.towerTop !== 'openwork') for (const s of [-1, 1]) { K.pinnacle(s * tc, H_TOWER + 1, -3, Math.max(5, th + 3), true); if (th >= 4) { K.pinnacle(s * (tc - 3), H_TOWER + 1, -6, 4, false); K.pinnacle(s * (tc + 3), H_TOWER + 1, -6, 4, false); } }
+  put(0, gBase + gh + 1, -1, post()); put(0, gBase + gh + 2, -1, post()); put(0, gBase + gh + 3, -1, rod());
+  return { mine, statues: K.statues, pins: K.pins, width: 2 * U + 1 };
+}
+// a tower's outer side (north or south): the same storeys as the front, a buttress at the back corner,
+// a lancet in the rose storey, a band of niches, an open belfry. Face plane z = s * zf, u = world x.
+function gothicTowerSide(S, L, o, s, zf, x0, x1, mine) {
+  const { H_PORT, H_GAL, H_ROSE, H_KING, top: H_TOWER } = L;
+  const dir = s > 0 ? { in: 'north', out: 'south', un: 'west', up: 'east' } : { in: 'south', out: 'north', un: 'west', up: 'east' };
+  const K = gothicKit(S, o, (u, v, d) => [u, v, s * (zf + d)], dir, 'x', mine);
+  const { setD, getD, ATT } = K;
+  const bu0 = x1 - 2, isBut = u => u >= bu0, butD = v => v <= H_PORT ? 4 : v <= H_ROSE ? 3 : v < H_KING ? 2 : 1;
+  const us = []; for (let u = x0; u <= x1; u++) us.push(u);
+  for (let v = 0; v <= H_TOWER; v++) for (const u of us) setD(u, v, isBut(u) ? butD(v) : 0, isBut(u) ? 'frame' : 'infill');
+  const cu = (x0 + bu0 - 1) >> 1, room = bu0 - x0;            // centre and width of the plain part
+  for (let v = H_PORT + 2; v <= H_GAL - 1; v++) for (const u of us) if (!isBut(u) && (u - x0) % 4 !== 3 && (v < H_GAL - 1 || (u - x0) % 4 === 1)) { setD(u, v, -1, 'niche'); if ((u - x0) % 4 === 1 && v === H_PORT + 2) ATT.push(() => K.statue(u, v, -1)); }
+  const wl = Math.max(3, Math.min(7, (room - 2) | 1));
+  if (room >= 5) K.lancet(cu, wl, H_GAL + 2, H_ROSE - 8, wl >= 7 ? 2 : 1, 0, H_ROSE);
+  K.kings(H_ROSE, H_KING, us, () => 0, isBut);
+  const wb = Math.max(3, Math.min(5, (room - 4) | 1));
+  if (room >= 5) K.belfry(cu, wb, room - wb >= 4 ? 2 : 1, H_KING + 3, H_TOWER - 10, isBut);
+  if (o.forest) K.panels(us, H_GAL + 1, H_TOWER - 2, isBut);
+  K.fill();
+  const rows = [H_PORT + 1, H_GAL, H_ROSE + 1, H_KING - 1, H_TOWER]; rows.parapet = [H_GAL, H_KING - 1, H_TOWER];
+  K.courses(rows, us, isBut);
+  for (const f of ATT) f();
+  K.pinnacle(x1 - 1, H_TOWER + 1, 1, 5, true);
+  for (const v of [H_PORT + 1, H_ROSE + 1, H_KING]) { const d = butD(v) + 1; if (getD(x1 - 1, v - 1) === d) K.pinnacle(x1 - 1, v, d, 2, false); }
+  return { statues: K.statues, pins: K.pins };
+}
+// facade blocks left floating (not joined to the ground through faces) are removed and counted; should be 0
+function gothicDropFloating(S, mine) {
+  const seen = new Set(), q = [];
+  for (const k of S.blocks.keys()) if (k.split(',')[1] === '0') { seen.add(k); q.push(k); }
+  while (q.length) { const [x, y, z] = q.pop().split(',').map(Number); for (const [a, b, c] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) { const k = (x + a) + ',' + (y + b) + ',' + (z + c); if (!seen.has(k) && S.blocks.has(k)) { seen.add(k); q.push(k); } } }
+  let n = 0; for (const k of mine) if (S.blocks.has(k) && !seen.has(k)) { S.blocks.delete(k); n++; }
+  return n;
+}
+// an aisle's outer wall (north or south side of nave and choir): a plinth, a sill course, a pier with a set-back
+// on every bay line (where the flying buttresses stand), a lancet with reveals in every bay, a cornice and an
+// open parapet in front of the lean-to roof. Thin: only one block behind the wall plane is touched.
+function gothicSideWall(S, o, s, zf, x0, x1, bay, vTop, mine, vBase = 0) {   // vBase > 0: an upper wall (clerestory) standing on a roof
+  const dir = s > 0 ? { in: 'north', out: 'south', un: 'west', up: 'east' } : { in: 'south', out: 'north', un: 'west', up: 'east' };
+  const K = gothicKit(S, { ...o, thick: 2, backMax: -2 }, (u, v, d) => [u, v, s * (zf + d)], dir, 'x', mine);   // walls 3 thick: room for deep reveals
+  const { setD, ATT } = K;
+  const pier = u => ((u % bay) + bay) % bay === 0, shoulder = u => pier(u - 1) || pier(u + 1);
+  const us = []; for (let u = x0; u <= x1; u++) us.push(u);
+  const set = vBase ? -1 : vTop - 3, sill = vBase ? vBase + 3 : o.forest ? Math.max(3, Math.min(7, vTop - 9)) : 3;   // Cologne: windows start higher, a chequered dado below them
+  for (let v = vBase; v <= vTop; v++) for (const u of us) {
+    if (pier(u)) setD(u, v, v < set ? 2 : 1, 'frame');
+    else if (shoulder(u)) setD(u, v, v < set ? 1 : 0, 'frame');
+    else setD(u, v, !vBase && v <= 1 ? 1 : 0, !vBase && v <= 1 ? 'frame' : !vBase && o.forest && v >= 2 && v < sill - 1 ? 'checker' : 'infill');
+  }
+  const free = bay - 3, w = Math.max(1, Math.min(5, (free - 1) | 1)), ord = w >= 3 ? 1 : 0, hs = Math.max(vBase + 5, vTop - 4 - (w >> 1));
+  let nw = 0;
+  for (let xb = Math.ceil(x0 / bay) * bay - bay; xb <= x1; xb += bay) {
+    const xm = xb + (bay >> 1); if (xm - (w >> 1) - ord < x0 || xm + (w >> 1) + ord > x1) continue;
+    if (hs - vBase >= 5) { K.lancet(xm, w + 2 * ord, sill, hs, ord, 0, vBase || o.forest ? vTop + 6 : vTop - 1, !!vBase || !!o.forest); nw++; }   // a gablet (wimperg) over each window, up through the eaves (aisles too in the pinnacle-forest styles)   // clerestory: a gablet (wimperg) over each window, up through the eaves
+  }
+  if (o.forest && !vBase) K.panels(us, sill, vTop - 1, u => pier(u) || shoulder(u));
+  K.fill();
+  const rows = [vBase + 2, vTop]; rows.parapet = [vTop];
+  K.courses(rows, us, u => pier(u));
+  for (const f of ATT) f();
+  if (vBase) for (const u of us) if (pier(u)) K.pinnacle(u, vTop + 1, 1, 2, false);   // eaves pinnacles over the flyers' landings
+  if (o.forest) for (const u of us) if (shoulder(u) && us.includes(u)) K.pinnacle(u, vTop + 1, vBase ? 0 : 1, vBase ? 2 : 3, false);   // pinnacle forest: one more on each side of every pier
+  if (o.forest && !vBase) for (const u of us) if (pier(u)) K.pinnacle(u, vTop + 1, 2, 2, false);
+  return { windows: nw };
+}
+// a transept front (north or south end): corner piers, a portal with a gable, a band of statue niches, up to vTop
+function gothicTransept(S, o, s, zf, x0, x1, vTop, mine, wallTop = vTop, apex = 0) {
+  const dir = s > 0 ? { in: 'north', out: 'south', un: 'west', up: 'east' } : { in: 'south', out: 'north', un: 'west', up: 'east' };
+  const K = gothicKit(S, o, (u, v, d) => [u, v, s * (zf + d)], dir, 'x', mine);
+  const { setD } = K;
+  const isBut = (au, u) => u <= x0 + 1 || u >= x1 - 1;
+  const us = []; for (let u = x0; u <= x1; u++) us.push(u);
+  for (let v = 0; v <= wallTop; v++) for (const u of us) if (v <= vTop || isBut(0, u)) setD(u, v, isBut(0, u) ? (v < vTop - 6 ? 3 : v <= vTop ? 2 : 1) : 0, isBut(0, u) ? 'frame' : 'infill');
+  const xm = (x0 + x1) >> 1, room = x1 - x0 - 3, w = Math.max(5, Math.min(11, (room - 2) | 1)), ord = Math.max(1, Math.min(4, (w - 3) >> 1));
+  K.portal(xm, w, Math.round(w * 0.7), ord, 2, isBut);
+  const vb = gothicArchTop(w, Math.round(w * 0.7)) + (w >> 1) + 8;
+  if (o.bigWindow) {                                 // Cologne: no rose; one tall traceried window filling the front, a wimperg over it
+    const wl = Math.max(5, Math.min(13, (room - 2) | 1)), v0 = vb - 4, hs = (apex || wallTop) - 7 - Math.floor(Math.sqrt(3) * wl / 2);   // the window rises into the gable
+    if (hs - v0 >= 6) K.lancet(xm, wl, v0, hs, 2, 0, (apex || wallTop) - 2, true);
+  } else if (vb + 7 <= vTop) K.kings(vb, vb + 8, us, () => 0, u => isBut(0, u));
+  K.fill();
+  const rows = [vb, vTop]; rows.parapet = [];
+  K.courses(rows, us, u => isBut(0, u));
+  for (const f of K.ATT) f();
+  for (const u of [x0, x1]) { K.pinnacle(u + (u === x0 ? 1 : -1), vTop + 1, 3, 2, false); K.pinnacle(u + (u === x0 ? 1 : -1), wallTop + 1, 1, 4, true); }
+  if (apex) K.pinnacle(xm, apex + 1, 0, 3, false);   // a slim finial: the gable's peak is a single block wide
+  return { statues: K.statues };
+}
+// a single big pinnacle at world (x, y, z) (on flying-buttress piers, round the east end)
+function gothicPinnacleAt(S, o, x, y, z, h, big, mine) {
+  const K = gothicKit(S, o, (u, v, d) => [-d, v, u], GOTHIC_FRONT_DIR, 'z', mine);
+  K.pinnacle(z, y, -x, h, big);
+}
+// a short plain wall (transept east / west sides): plinth, sill course, cornice with an open parapet. Face plane x = xf.
+function gothicShortWall(S, o, sx, xf, z0, z1, vTop, mine) {
+  const dir = sx < 0 ? { in: 'east', out: 'west', un: 'north', up: 'south' } : { in: 'west', out: 'east', un: 'north', up: 'south' };
+  const K = gothicKit(S, { ...o, thick: 1, backMax: -1 }, (u, v, d) => [xf + sx * d, v, u], dir, 'z', mine);
+  const us = []; for (let u = Math.min(z0, z1); u <= Math.max(z0, z1); u++) us.push(u);
+  for (let v = 0; v <= vTop; v++) for (const u of us) K.setD(u, v, v <= 1 ? 1 : 0, v <= 1 ? 'frame' : 'infill');
+  K.fill();
+  const rows = [2, vTop]; rows.parapet = [vTop];
+  K.courses(rows, us, () => false);
+}
+// a flying buttress (single): a pier outside the aisle wall, 3 wide, stepping in twice, crowned by a pinnacle of the
+// pier's own width; an arch whose top is a straight sloping coping and whose underside is a curve, thick at the pier and
+// thin at the wall, landing on the clerestory pilaster. z0 = the aisle wall plane, zw = the clerestory face (+1).
+function gothicFlyer(S, o, s, xb, z0, yp, zw, yw, RH, mine, zMid = null) {   // zMid: an intermediate pier (between two aisles) carrying its own pinnacle
+  const put = (x, y, z, b) => { S.set(x, y, z, b); mine.add(x + ',' + y + ',' + z); };
+  const st = (m, f, h = 'bottom') => B(m, { facing: f, half: h, shape: 'straight', waterlogged: false });
+  const IN = s > 0 ? 'north' : 'south', OUT = s > 0 ? 'south' : 'north';
+  const y1 = Math.round(yp * 0.45), y2 = Math.round(yp * 0.75);
+  for (let y = 0; y <= yp; y++) for (let dx = -1; dx <= 1; dx++) {
+    const deep = y <= y1 ? 5 : y <= y2 ? 4 : 3;
+    for (let k = 1; k <= deep; k++) put(xb + dx, y, s * (z0 + k), B(y === 0 ? o.plinth || o.frame : o.frame));
+    if (y === y1 + 1 || y === y2 + 1) put(xb + dx, y, s * (z0 + deep + 1), st(o.stairs, IN));   // weathering on each set-back
+  }
+  gothicPinnacleAt(S, o, xb, yp + 1, s * (z0 + 2), 3, true, mine);
+  const span = Math.max(1, z0 - zw), ys = yp - Math.max(3, Math.round(span * 0.6));
+  let prevTop = null;
+  for (let a = z0; a >= zw; a--) {
+    const t = (z0 - a) / span, z = s * a;
+    let top = Math.round(yp + (yw - yp) * t), bot = Math.round(ys + (yw - 1 - ys) * Math.sin(t * Math.PI / 2));
+    const rh = RH.get(xb + ',' + z); if (rh !== undefined) bot = Math.max(bot, Math.ceil(rh));
+    if (prevTop !== null && bot > prevTop) bot = prevTop;      // stay joined to the previous column
+    if (top < bot + 1) top = bot + 1;
+    for (let y = bot; y <= top; y++) if (!/pane/.test(S.get(xb, y, z) || '')) put(xb, y, z, B(o.frame));
+    put(xb, top, z, st(o.stairs, IN));                          // the coping slopes up toward the wall
+    if (top - bot >= 2) put(xb, bot, z, st(o.stairs, OUT, 'top'));   // the underside curve
+    prevTop = top;
+    if (zMid !== null && a === zMid) {          // the intermediate pier: a column from the roof up into the arch, a pinnacle on the coping
+      const r0 = rh !== undefined ? Math.ceil(rh) : 1;
+      for (let y = r0; y < bot; y++) put(xb, y, z, B(o.frame));
+      gothicPinnacleAt(S, o, xb, top + 1, z, 3, false, mine);
+    }
+  }
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// Parts for the other styles (German / Italian / Spanish). World coordinates throughout.
+// ---------------------------------------------------------------------------------------------
+// An octagonal spire on (cx, y0, cz): base radius R0, height H.
+//   open  — Cologne: first an open octagonal stage (tall arches between eight corner piers, a gablet over each
+//           cardinal face, a small pinnacle on every corner), then the pierced spire: eight ribs with crockets every
+//           second row, solid bands every few rows, otherwise open faces with one mullion in the middle of each face
+//   solid — a plain needle with crockets on the ribs
+// mats: { frame, stairs, wall, slab } ; tip: block on the very top (e.g. gold for Milan's Madonnina)
+function gothicSpire(S, mats, cx, y0, cz, R0, H, mode, mine, tip, drum = 0) {
+  const put = (x, y, z, b) => { S.set(x, y, z, b); mine.add(x + ',' + y + ',' + z); };
+  const st = (f, h = 'bottom') => B(mats.stairs, { facing: f, half: h, shape: 'straight', waterlogged: false });
+  const post = () => B(mats.wall, { east: 'none', north: 'none', south: 'none', up: true, waterlogged: false, west: 'none' });
+  const rod = () => B('end_rod', { facing: 'up' });
+  const M = r => Math.round(r * 1.42);
+  const oct = (dx, dz, r) => Math.max(Math.abs(dx), Math.abs(dz)) <= r && Math.abs(dx) + Math.abs(dz) <= M(r);
+  const ringOf = r => { const c = []; for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) if (oct(dx, dz, r) && !oct(dx, dz, r - 1)) c.push([dx, dz]); return c; };
+  const isRib = (dx, dz, r) => { const ad = Math.abs(dx), az = Math.abs(dz), k = M(r) - r; return r <= 1 || (ad === r && az === k) || (az === r && ad === k); };
+  const isMid = (dx, dz, r) => { const ad = Math.abs(dx), az = Math.abs(dz); return (ad === r && az === 0) || (az === r && ad === 0) || (ad + az === M(r) && Math.abs(ad - az) <= 1); };
+  const crocket = (dx, dz, y) => { const ox = Math.sign(dx), oz = Math.sign(dz);
+    if (ox && !S.has(cx + dx + ox, y, cz + dz)) put(cx + dx + ox, y, cz + dz, st(ox > 0 ? 'west' : 'east'));
+    else if (oz && !S.has(cx + dx, y, cz + dz + oz)) put(cx + dx, y, cz + dz + oz, st(oz > 0 ? 'north' : 'south')); };
+  let yb = y0;
+  if (mode === 'open' && drum > 0) {                          // the open octagonal stage
+    for (let i = 0; i < drum; i++) for (const [dx, dz] of ringOf(R0)) {
+      const y = y0 + i, solid = i === 0 || i >= drum - 2 || isRib(dx, dz, R0);
+      if (solid) put(cx + dx, y, cz + dz, B(mats.frame)); else if (isMid(dx, dz, R0) && i < drum - 3) put(cx + dx, y, cz + dz, post());
+    }
+    for (const [dx, dz] of ringOf(R0)) if (isRib(dx, dz, R0)) { put(cx + dx, y0 + drum, cz + dz, B(mats.frame)); put(cx + dx, y0 + drum + 1, cz + dz, post()); put(cx + dx, y0 + drum + 2, cz + dz, rod()); }   // corner pinnacles
+    for (const [ux, uz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {   // a gablet over each cardinal face
+      const k = M(R0) - R0;
+      for (let t = -k; t <= k; t++) { const h = k - Math.abs(t); for (let j = 0; j <= h; j++) { const x = cx + (ux ? ux * R0 : t), z = cz + (uz ? uz * R0 : t); put(x, y0 + drum + j, z, j === h ? st(ux > 0 ? 'west' : ux < 0 ? 'east' : uz > 0 ? 'north' : 'south') : B(mats.frame)); } }
+      put(cx + ux * R0, y0 + drum + k + 1, cz + uz * R0, rod());
+    }
+    for (let dx = -R0; dx <= R0; dx++) for (let dz = -R0; dz <= R0; dz++) if (oct(dx, dz, R0 - 1)) put(cx + dx, y0 + drum - 1, cz + dz, B(mats.slab, { type: 'top', waterlogged: false }));   // floor of the spire
+    yb = y0 + drum; R0 = Math.max(2, R0 - 1);
+  }
+  let rPrev = -1;
+  for (let i = 0; i < H; i++) {
+    const y = yb + i, r = Math.max(0, Math.round(R0 * (1 - i / H))), step = rPrev > r, rp = rPrev; rPrev = r;
+    if (step) for (const [dx, dz] of ringOf(rp)) if (!oct(dx, dz, r - 1)) put(cx + dx, y, cz + dz, B(mats.frame));   // a ledge where it steps in, joining ring to ring
+    if (r === 0) { put(cx, y, cz, i < H - 2 ? B(mats.frame) : post()); continue; }
+    const band = mode === 'open' && (i % 6 === 0 || i < 1 || step);
+    for (const [dx, dz] of ringOf(r)) {
+      const rib = isRib(dx, dz, r);
+      if (mode === 'open' && !rib && !band) { if (isMid(dx, dz, r)) put(cx + dx, y, cz + dz, post()); continue; }   // open tracery: one mullion per face
+      put(cx + dx, y, cz + dz, B(mats.frame));
+      if (rib && i % 2 === 1) crocket(dx, dz, y);
+    }
+    if (mode !== 'open') for (let dx = -r + 1; dx <= r - 1; dx++) for (let dz = -r + 1; dz <= r - 1; dz++) if (oct(dx, dz, r - 1)) put(cx + dx, y, cz + dz, B(mats.frame));
+  }
+  const yt = yb + H;
+  if (tip) { put(cx, yt, cz, B(tip)); put(cx, yt + 1, cz, rod()); return yt + 2; }
+  put(cx, yt, cz, post()); put(cx, yt + 1, cz, rod());
+  for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(cx + a, yt, cz + b, B('end_rod', { facing: a > 0 ? 'east' : a < 0 ? 'west' : b > 0 ? 'south' : 'north' }));   // a cross-shaped finial
+  return yt + 2;
+}
+// Milan's crossing (tiburio): an octagonal drum with lancets and a pinnacle on every corner, a gallery, a second, smaller
+// open stage, then a slender open needle with the golden statue on top
+function gothicLantern(S, mats, cx, y0, cz, R, Hd, Hs, mine, pane) {
+  const put = (x, y, z, b) => { S.set(x, y, z, b); mine.add(x + ',' + y + ',' + z); };
+  const M = r => Math.round(r * 1.42);
+  const oct = (dx, dz, r) => Math.max(Math.abs(dx), Math.abs(dz)) <= r && Math.abs(dx) + Math.abs(dz) <= M(r);
+  const post = () => B(mats.wall, { east: 'none', north: 'none', south: 'none', up: true, waterlogged: false, west: 'none' });
+  for (let i = 0; i < Hd; i++) for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) {
+    if (!oct(dx, dz, R)) continue;
+    const ring = !oct(dx, dz, R - 1), y = y0 + i;
+    if (!ring) { if (i === Hd - 1) put(cx + dx, y, cz + dz, B(mats.frame)); continue; }
+    const win = i >= 2 && i <= Hd - 3 && (Math.abs(dx) <= 1 || Math.abs(dz) <= 1) && (Math.abs(dx) === R || Math.abs(dz) === R);
+    put(cx + dx, y, cz + dz, win ? pane(cx + dx, y, cz + dz, Math.abs(dx) === R ? 'z' : 'x') : B(mats.frame));
+  }
+  const yt = y0 + Hd;
+  for (let dx = -R - 1; dx <= R + 1; dx++) for (let dz = -R - 1; dz <= R + 1; dz++) if (oct(dx, dz, R + 1) && !oct(dx, dz, R)) put(cx + dx, yt - 1, cz + dz, B(mats.slab, { type: 'top', waterlogged: false }));   // cornice
+  for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) if (oct(dx, dz, R) && !oct(dx, dz, R - 1)) {
+    const ad = Math.abs(dx), az = Math.abs(dz), k = M(R) - R, corner = (ad === R && az === k) || (az === R && ad === k);
+    if (corner) { for (let j = 0; j < 4; j++) put(cx + dx, yt + j, cz + dz, j < 2 ? B(mats.frame) : post()); put(cx + dx, yt + 4, cz + dz, B('end_rod', { facing: 'up' })); }   // corner pinnacles
+    else if ((dx + dz) % 2 === 0) put(cx + dx, yt, cz + dz, post());   // gallery parapet
+  }
+  const R2 = Math.max(2, R - 3);                             // the second, open stage
+  for (let i = 0; i < 6; i++) for (let dx = -R2; dx <= R2; dx++) for (let dz = -R2; dz <= R2; dz++) {
+    if (!oct(dx, dz, R2) || oct(dx, dz, R2 - 1)) continue;
+    const ad = Math.abs(dx), az = Math.abs(dz), k = M(R2) - R2, corner = (ad === R2 && az === k) || (az === R2 && ad === k);
+    if (i === 0 || i >= 4 || corner) put(cx + dx, yt + i, cz + dz, B(mats.frame));
+  }
+  for (let dx = -R2; dx <= R2; dx++) for (let dz = -R2; dz <= R2; dz++) if (oct(dx, dz, R2 - 1)) { put(cx + dx, yt, cz + dz, B(mats.frame)); put(cx + dx, yt + 5, cz + dz, B(mats.frame)); }
+  return gothicSpire(S, mats, cx, yt + 6, cz, 2, Hs, 'open', mine, 'gold_block');
+}
+// A screen front (Italian / Spanish): no towers; the front follows the section — a gable (or a flat parapet) over the
+// nave, lower slopes over the aisles — divided by tall buttress piers that rise above the edge and end in pinnacles.
+// A portal in every strip, a big traceried window over each. Frame: u = world z, d outward = -x (as the west front).
+function gothicScreen(S, P, o) {
+  const { hw, NA, AW, edge, NT, IT, OT, ridge, flat } = P;
+  const mine = new Set();
+  const K = gothicKit(S, o, (u, v, d) => [-d, v, u], GOTHIC_FRONT_DIR, 'z', mine);
+  const { setD, ATT, put, st, FST } = K;
+  const piers = [hw + 1]; if (NA === 2) piers.push(hw + AW + 1); piers.push(edge + 1);
+  const isPier = au => piers.some(c => Math.abs(au - c) <= 1);
+  const U = edge + 2, us = []; for (let u = -U; u <= U; u++) us.push(u);
+  const topAt = au => {                                                   // the front's top edge over each strip
+    if (au <= hw) return flat ? NT + 3 : NT + 3 + Math.round((hw + 0.5 - au) * (ridge - NT) / (hw + 0.5));
+    if (au <= hw + AW) return flat ? IT + 3 : IT + 3 + Math.round((hw + AW + 0.5 - au) * 0.5);
+    return flat ? OT + 3 : OT + 3 + Math.round((edge + 0.5 - au) * 0.5);
+  };
+  for (const u of us) { const au = Math.abs(u); const t = isPier(au) ? topAt(Math.max(0, au - 2)) + 4 : topAt(au); for (let v = 0; v <= t; v++) setD(u, v, isPier(au) ? (v < t * 0.4 ? 3 : v < t * 0.75 ? 2 : 1) : 0, isPier(au) ? 'frame' : 'infill'); }
+  // strips: centre (nave), inner aisles, outer aisles
+  const strips = [[0, hw - 1]]; for (const s of [-1, 1]) { strips.push([s * (hw + 2 + ((AW - 3) >> 1)), (AW - 3) >> 1]); if (NA === 2) strips.push([s * (hw + AW + 2 + ((edge - hw - AW - 3) >> 1)), (edge - hw - AW - 3) >> 1]); }
+  let portals = 0, wins = 0;
+  for (const [uc, half] of strips) {
+    if (half < 1) continue;
+    const w = Math.max(3, (2 * half - 1) | 1), hs = Math.max(4, Math.round(w * 0.75)), ord = Math.max(1, Math.min(4, (w - 3) >> 1));
+    const ptop = gothicArchTop(w, hs) + (w >> 1) + 4;
+    K.portal(uc, w, hs, ord, 2, au => isPier(Math.abs(au)), Math.min(ptop, topAt(Math.abs(uc)) - 6)); portals++;
+    const v0 = Math.min(ptop, topAt(Math.abs(uc)) - 6) + 2, lw = Math.max(3, Math.min(9, (2 * half - 1) | 1)), lhs = topAt(Math.abs(uc)) - 4 - Math.floor(Math.sqrt(3) * lw / 2);
+    if (lhs - v0 >= 4) { K.lancet(uc, lw, v0, lhs, lw >= 7 ? 2 : 1, 0, topAt(Math.abs(uc)) - 1); wins++; }
+  }
+  K.fill();
+  for (const u of us) {                                                   // the top edge: crockets on slopes, a parapet on flats
+    const au = Math.abs(u); if (isPier(au)) continue;
+    const t = topAt(au), tn = topAt(Math.abs(u) + 1);
+    if (flat || t === tn) put(u, t + 1, 0, au % 2 ? K.post() : B(o.slab, { type: 'bottom', waterlogged: false }));
+    else if (au % 2 === 1) put(u, t + 1, 0, st(FST, u < 0 ? 'south' : 'north'));
+  }
+  for (const f of ATT) f();
+  for (const c of piers) for (const s of [-1, 1]) {
+    const u = s * c, t = topAt(Math.max(0, c - 2)) + 4;
+    for (let v = 6; v + 4 < t - 4; v += 9) { for (let y = v; y < v + 4; y++) put(u, y, 1, 'minecraft:air'); K.statue(u, v, 0); put(u, v + 4, 1, st(FST, 'east', 'top')); }
+    K.pinnacle(u, t + 1, 1, 4, true);
+  }
+  if (!flat) { const t = topAt(0); put(0, t + 1, 0, K.post()); put(0, t + 2, 0, K.post()); put(0, t + 3, 0, B('end_rod', { facing: 'up' })); }
+  return { mine, statues: K.statues, pins: K.pins, portals, windows: wins, width: 2 * U + 1 };
+}
+// Seville's Giralda: a square brick shaft with a lattice (sebka) of raised posts on its upper part, a belfry with arches,
+// then two stepped stages and a small cap with a weathervane. (x0, z0) = the shaft's corner, n = width.
+function gothicCampanile(S, o, x0, z0, n, H, mine) {
+  const put = (x, y, z, b) => { S.set(x, y, z, b); mine.add(x + ',' + y + ',' + z); };
+  const brick = o.brick || 'bricks', trim = o.frame;
+  const shaft = Math.round(H * 0.66), bel = Math.round(H * 0.12);
+  const ring = (x, z, a, w) => x === a || z === a || x === a + w - 1 || z === a + w - 1;
+  for (let y = 0; y < shaft; y++) for (let i = 0; i < n; i++) for (let k = 0; k < n; k++) {
+    const x = x0 + i, z = z0 + k, edge = i === 0 || k === 0 || i === n - 1 || k === n - 1;
+    if (!edge) { if (y === 0 || y % 12 === 0) put(x, y, z, B(brick)); continue; }
+    const corner = (i === 0 || i === n - 1) && (k === 0 || k === n - 1);
+    put(x, y, z, B(corner || y === 0 ? trim : brick));
+    // the lattice: a diamond net of brick posts standing out from the upper two-thirds of each face
+    if (!corner && y > shaft * 0.35 && y < shaft - 2) {
+      const u = i === 0 || i === n - 1 ? k : i, ox = i === 0 ? -1 : i === n - 1 ? 1 : 0, oz = k === 0 ? -1 : k === n - 1 ? 1 : 0;
+      if (u >= 2 && u <= n - 3 && ((u + y) % 4 === 0 || (u - y + 400) % 4 === 0)) put(x + ox, y, z + oz, B(o.brickWall || 'brick_wall', { east: 'none', north: 'none', south: 'none', up: true, waterlogged: false, west: 'none' }));
+      if (u === (n >> 1) && y % 9 === 4) { put(x, y, z, 'minecraft:air'); put(x, y + 1, z, 'minecraft:air'); }   // small windows up the middle
+    }
+  }
+  for (let y = shaft; y < shaft + bel; y++) for (let i = 0; i < n; i++) for (let k = 0; k < n; k++) {
+    if (!ring(x0 + i, z0 + k, x0, n) || !ring(i, k, 0, n)) continue;
+    const u = i === 0 || i === n - 1 ? k : i, arch = u >= 2 && u <= n - 3 && u !== (n >> 1) && y >= shaft + 1 && y <= shaft + bel - 3;
+    if (!arch) put(x0 + i, y, z0 + k, B(trim));
+  }
+  for (let i = -1; i <= n; i++) for (let k = -1; k <= n; k++) if (i === -1 || k === -1 || i === n || k === n) { put(x0 + i, shaft + bel, z0 + k, B(o.slab, { type: 'top', waterlogged: false })); if ((i + k) % 2 === 0) put(x0 + i, shaft + bel + 1, z0 + k, B(o.wall, { east: 'none', north: 'none', south: 'none', up: true, waterlogged: false, west: 'none' })); }
+  for (let i = 0; i < n; i++) for (let k = 0; k < n; k++) put(x0 + i, shaft + bel, z0 + k, B(trim));
+  put(x0 + (n >> 1), shaft + 1, z0 + (n >> 1), B('bell', { attachment: 'floor', facing: 'north', powered: false }));
+  // stepped stages
+  let y = shaft + bel + 1, w = n - 2, a = 1;
+  for (const hh of [Math.round(H * 0.09), Math.round(H * 0.07)]) {
+    if (w < 3) break;
+    for (let j = 0; j < hh; j++) for (let i = 0; i < w; i++) for (let k = 0; k < w; k++) {
+      const e = i === 0 || k === 0 || i === w - 1 || k === w - 1; if (!e) continue;
+      const mid = (i === (w >> 1) || k === (w >> 1)) && j >= 1 && j <= hh - 2;
+      if (!mid) put(x0 + a + i, y + j, z0 + a + k, B(trim));
+    }
+    for (let i = 0; i < w; i++) for (let k = 0; k < w; k++) put(x0 + a + i, y + hh, z0 + a + k, B(trim));
+    y += hh + 1; w -= 2; a += 1;
+  }
+  const cx = x0 + (n >> 1), cz = z0 + (n >> 1);
+  put(cx, y, cz, B(trim)); put(cx, y + 1, cz, B('gold_block')); put(cx, y + 2, cz, B('lightning_rod', { facing: 'up', powered: false, waterlogged: false }));
+  return y + 3;
+}
+// The court of oranges: a low arcaded wall round a gravel court, rows of small trees, a fountain in the middle.
+function gothicCourt(S, o, x0, x1, z0, z1, mine) {
+  const put = (x, y, z, b) => { S.set(x, y, z, b); mine.add(x + ',' + y + ',' + z); };
+  const leaves = B('azalea_leaves', { distance: 1, persistent: true, waterlogged: false });
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+    const e = x === x0 || x === x1 || z === z0 || z === z1;
+    put(x, 0, z, B(e ? o.frame : (x + z) % 2 ? 'smooth_sandstone' : 'cut_sandstone'));
+    if (!e) continue;
+    const along = z === z0 || z === z1 ? x - x0 : z - z0;
+    const door = (x === ((x0 + x1) >> 1) && (z === z0 || z === z1)) || (z === ((z0 + z1) >> 1) && x === x0);
+    for (let y = 1; y <= 4; y++) { if (door && y <= 3) continue; put(x, y, z, B(along % 3 === 0 || y === 4 ? o.frame : y === 3 ? o.frame : 'minecraft:air' === '' ? '' : o.frame)); }
+    if (along % 3 !== 0 && !door) { put(x, 1, z, 'minecraft:air'); put(x, 2, z, 'minecraft:air'); }     // an open arcade
+    put(x, 5, z, (x + z) % 2 ? B(o.wall, { east: 'none', north: 'none', south: 'none', up: true, waterlogged: false, west: 'none' }) : B(o.slab, { type: 'bottom', waterlogged: false }));
+  }
+  const cx = (x0 + x1) >> 1, cz = (z0 + z1) >> 1;
+  for (let x = x0 + 3; x <= x1 - 3; x += 4) for (let z = z0 + 3; z <= z1 - 3; z += 4) {
+    if (Math.abs(x - cx) <= 2 && Math.abs(z - cz) <= 2) continue;
+    put(x, 1, z, B('oak_log', { axis: 'y' })); put(x, 2, z, B('oak_log', { axis: 'y' }));
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { put(x + a, 3, z + b, leaves); if (!a || !b) put(x + a, 2, z + b, a || b ? leaves : B('oak_log', { axis: 'y' })); }
+    put(x, 4, z, leaves);
+  }
+  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) put(cx + a, 1, cz + b, a || b ? B(o.frame) : B('water', { level: 0 }));   // a basin with one source in the middle
+  put(cx, 0, cz, B(o.frame));
+}
+
+// ---------------------------------------------------------------------------------------------
 // Cathedral (主教座堂). Long axis along x like the church: the west front stands at x = 0, the east end
 // (chevet) at the far +x end; north is -z. The plan is a raster of zones, each with its own wall top:
 //   H  the high body: nave, crossing, transept, choir and apse (one height; gable roofs whose ridges cross)
@@ -3422,22 +4008,37 @@ function church(o = {}) {
 // French preset after Notre-Dame de Paris (128 × 48 m, vault 33 m, towers 69 m, flèche 96 m); the defaults are
 // that building at about 0.8 block per metre. Every size can be set on its own.
 // ---------------------------------------------------------------------------------------------
-const CATHEDRAL_STYLES = { french: '法式（巴黎圣母院）' };
+const CATHEDRAL_STYLES = { french: '法式（兰斯 / 巴黎圣母院）', german: '德式（科隆）', italian: '意式（米兰）', spanish: '西班牙（塞维利亚）' };
+// a style = a set of starting values; every value can still be changed afterwards (the panel copies them in when the style changes)
+const CATHEDRAL_PRESETS = {
+  french: { pinnacle_forest: false, facade: 'detailed', tower_top: 'flat', crossing: 'fleche', roof_style: 'pitched', campanile: false, court: false },
+  german: { pinnacle_forest: true, rose: false, kings: false, roof: 'stone', facade: 'detailed', tower_top: 'openwork', crossing: 'turret', roof_style: 'pitched', campanile: false, court: false, nave_bays: 10, width: 15, aisle_width: 6, arcade_height: 15, gallery_height: 4, clerestory_height: 15, transept_depth: 4, chapels: 7, roof_pitch: 'steep', walls: 'warm', fleche_height: 30 },
+  italian: { pinnacle_forest: true, facade: 'screen', tower_top: 'none', crossing: 'lantern', roof_style: 'pitched', campanile: false, court: false, nave_bays: 9, width: 19, aisle_width: 6, arcade_height: 16, gallery_height: 0, clerestory_height: 8, transept_depth: 4, east_end: 'apse', roof_pitch: 'normal', walls: 'marble', roof: 'stone', fleche_height: 30 },
+  spanish: { pinnacle_forest: false, facade: 'screen', tower_top: 'none', crossing: 'cimborio', roof_style: 'terrace', campanile: true, court: true, nave_bays: 9, width: 17, aisle_width: 7, arcade_height: 15, gallery_height: 0, clerestory_height: 10, transept_depth: 0, east_end: 'flat', walls: 'warm', roof: 'stone' },
+};
+const CATHEDRAL_TOWER_TOPS = { flat: '平顶 + 尖塔群（兰斯）', openwork: '镂空尖塔（科隆）', none: '无塔' };
+const CATHEDRAL_CROSSINGS = { fleche: '细尖塔（巴黎）', turret: '铜绿小尖塔（科隆）', lantern: '八角采光塔 + 金像（米兰）', cimborio: '抬高的方形采光塔（塞维利亚）', none: '无' };
+const CATHEDRAL_ROOF_STYLES = { pitched: '坡屋顶', terrace: '平台屋顶（带栏杆）' };
+// white marble (Milan); cathedral only
+const CATHEDRAL_MARBLE = { label: '白大理石', mix: [['calcite', 4], ['quartz_block', 2], ['diorite', 1]], plinth: 'polished_diorite', set: 'stone' };
+// warm yellow sandstone (as Reims / Cologne in the references); cathedral only, so the church's palettes stay as they were
+const CATHEDRAL_WARM = { label: '暖黄砂岩', mix: [['smooth_sandstone', 4], ['sandstone', 3], ['cut_sandstone', 2]], plinth: 'cut_sandstone', set: 'sandstone' };
+const CATHEDRAL_FACADES = { detailed: '精细双塔立面（扶壁、多层拱门、雕像、尖塔群）', screen: '屏风立面（无塔，米兰 / 塞维利亚）', simple: '简单（旧版平立面）' };
 const CATHEDRAL_EAST = { chevet: '回廊 + 放射小礼拜堂', apse: '半圆后殿', flat: '平直东端' };
 const CATHEDRAL_DEFAULT = {
-  style: 'french', nave_bays: 8, bay: 5, width: 11, aisles: 2, aisle_width: 4, transept: true, transept_depth: 2, choir_bays: 4,
-  east_end: 'chevet', chapels: 5, chapel_depth: 3, arcade_height: 9, gallery_height: 6, clerestory_height: 8, facade_extra: 2, tower_rise: 19,
-  rose: true, kings: true, flying_buttresses: true, pinnacles: true, fleche: true, fleche_height: 40, roof_pitch: 'medium',
+  style: 'french', facade: 'detailed', nave_bays: 9, bay: 8, width: 17, aisles: 2, aisle_width: 6, transept: true, transept_depth: 2, choir_bays: 4,
+  east_end: 'chevet', chapels: 5, chapel_depth: 4, arcade_height: 12, gallery_height: 6, clerestory_height: 13, facade_extra: 2, tower_rise: 24,
+  rose: true, kings: true, statues: true, portal_orders: 6, flying_buttresses: true, pinnacles: true, fleche: true, fleche_height: 50, roof_pitch: 'medium',
   walls: 'white', roof: 'slate', glass: 'colored', interior: false, seed: 1,
 };
 // the French preset's sizes at 1 block per metre; the panel's 比例 multiplies these (bay counts stay)
-const CATHEDRAL_BASE = { bay: 6, width: 13, aisle_width: 5, transept_depth: 2, chapel_depth: 4, arcade_height: 11, gallery_height: 8, clerestory_height: 10, facade_extra: 2, tower_rise: 24, fleche_height: 50 };
+const CATHEDRAL_BASE = { bay: 8, width: 17, aisle_width: 6, transept_depth: 2, chapel_depth: 4, arcade_height: 12, gallery_height: 6, clerestory_height: 13, facade_extra: 2, tower_rise: 24, fleche_height: 50 };   // 1.0 = the defaults (wide enough nave and aisles for the detailed front)
 const CATHEDRAL_RANGES = {
-  nave_bays: [3, 14], bay: [4, 8], width: [7, 21], aisle_width: [3, 7], transept_depth: [0, 10], choir_bays: [1, 10], chapels: [0, 9], chapel_depth: [2, 6],
-  arcade_height: [5, 16], gallery_height: [0, 12], clerestory_height: [4, 16], facade_extra: [1, 12], tower_rise: [8, 60], fleche_height: [10, 90],
+  nave_bays: [3, 14], bay: [4, 10], width: [7, 21], aisle_width: [3, 7], transept_depth: [0, 10], choir_bays: [1, 10], chapels: [0, 9], chapel_depth: [2, 6],
+  portal_orders: [1, 6], arcade_height: [5, 16], gallery_height: [0, 12], clerestory_height: [4, 16], facade_extra: [1, 12], tower_rise: [8, 60], fleche_height: [10, 90],
 };
 function cathedral(o = {}) {
-  const p = { ...CATHEDRAL_DEFAULT, ...o };
+  const p = { ...CATHEDRAL_DEFAULT, ...(CATHEDRAL_PRESETS[o.style] || {}), ...o };
   const cl = (v, a, b) => Math.max(a, Math.min(b, v));
   const report = [], adjust = [];
   const R = {};
@@ -3456,19 +4057,23 @@ function cathedral(o = {}) {
   const NT = IRT + CH;                                  // nave wall top
   const PR = ROOF_PITCHES[p.roof_pitch] || ROOF_PITCHES.medium, pitch = PR.r;
   const ridge = NT + 1 + Math.round(pitch * hw);
-  const FT = ridge + R.facade_extra, TT = FT + R.tower_rise;
+  const FT = ridge + R.facade_extra;
+  const detailed = (p.facade || 'detailed') !== 'simple', screen = p.facade === 'screen', terrace = p.roof_style === 'terrace';
+  const towers = !screen && p.tower_top !== 'none';
+  const GL = detailed && !screen ? gothicFrontLayout({ hw, edge: hw + NA * AW, NT, ridge, TT: FT + R.tower_rise }) : null;
+  const TT = GL ? GL.top : FT + R.tower_rise;
   const hasT = !!p.transept, tdep = hasT ? R.transept_depth : 0;
   const xN = NB * bay - 1, xc0 = hasT ? xN + 1 : 0, xc1 = hasT ? xN + W : -1, xcm = xc0 + hw;
   const xE = (hasT ? xc1 : xN) + CB * bay;
   const east = CATHEDRAL_EAST[p.east_end] ? p.east_end : 'chevet';
-  const nch = east === 'chevet' ? R.chapels : 0, cd = R.chapel_depth, CT = Math.max(4, OT - 2);
-  const TWD = edge - hw, TL = Math.min(TWD, Math.max(4, xN + 1 - bay));   // towers: as wide as the aisles, as long as that (or shorter on a short nave)
-  if (TL < TWD) report.push(`西塔：中殿太短，塔身沿长轴缩为 ${TL} 格`);
+  const nch = east === 'chevet' ? R.chapels : 0, cd = R.chapel_depth, CT = Math.max(4, p.pinnacle_forest ? OT : OT - 2);   // Cologne's chapels rise as high as the aisles
+  const TWD = edge - hw, TL = towers ? Math.min(TWD, Math.max(4, xN + 1 - bay)) : 0;   // towers: as wide as the aisles, as long as that (or shorter on a short nave)
+  if (towers && TL < TWD) report.push(`西塔：中殿太短，塔身沿长轴缩为 ${TL} 格`);
   const seed = p.seed || 1;
   const S = new Structure();
   // ---- materials (the same slots as the church) ----
   const matRep = [], MS = resolveMats(CHURCH_MAT_SLOTS, p.mats, matRep);
-  const WM0 = CHURCH_WALLS[p.walls] || CHURCH_WALLS.white, RM0 = CHURCH_ROOFS[p.roof] || CHURCH_ROOFS.slate;
+  const WM0 = p.walls === 'warm' ? CATHEDRAL_WARM : p.walls === 'marble' ? CATHEDRAL_MARBLE : CHURCH_WALLS[p.walls] || CHURCH_WALLS.white, RM0 = CHURCH_ROOFS[p.roof] || CHURCH_ROOFS.slate;
   const SM0 = FOUNTAIN_MATERIALS[WM0.set] || FOUNTAIN_MATERIALS.stone;
   const WM = { ...WM0, ...(MS.wall ? { mix: MS.wall.mix } : {}), ...(MS.plinth ? { plinth: MS.plinth.block } : {}) };
   const RM = MS.roof ? { ...RM0, stairs: MS.roof.stairs, slab: MS.roof.slab, block: MS.roof.block } : RM0;
@@ -3490,7 +4095,7 @@ function cathedral(o = {}) {
     const az = Math.abs(z);
     if (x < 0) return 0;
     if (x <= xE) {
-      if (x < TL && az > hw && az <= edge) return T;
+      if (towers && x < TL && az > hw && az <= edge) return T;
       if (az <= hw) return H;
       if (hasT && x >= xc0 && x <= xc1 && az <= edge + tdep) return H;
       if (az <= hw + AW) return I;
@@ -3561,6 +4166,7 @@ function cathedral(o = {}) {
   const hH = (x, z) => NT + 1 + Math.round(pitch * (dH(x, z) - 1));
   for (const [x, z] of cells) {
     if (zone(x, z) !== H) continue;
+    if (terrace) { S.set(x, NT + 1, z, border.has(x + ',' + z) ? (x + z) % 2 ? post() : B(SM.block) : slab(SM.slab)); RH.set(x + ',' + z, NT + 2); continue; }   // a walkable terrace behind a balustrade
     const h = hH(x, z);
     let up = null, uh = h, low = Infinity;
     for (const [dx, dz] of N4) {
@@ -3570,7 +4176,7 @@ function cathedral(o = {}) {
       low = Math.min(low, nh);
     }
     if (border.has(x + ',' + z)) for (let y = NT + 1; y < h; y++) S.set(x, y, z, wallB(x, y, z));    // gable ends
-    else for (let y = Math.max(NT + 1, low + 1); y < h; y++) S.set(x, y, z, B(RM.block));
+    else for (let y = Math.max(NT + 1, low); y < h; y++) S.set(x, y, z, B(RM.block));   // from the lowest neighbour's level, so the steps of a steep cone stay joined
     S.set(x, h, z, up ? stair(RM.stairs, DIR(...up)) : slab(RM.slab));
     RH.set(x + ',' + z, h + 1);
   }
@@ -3578,14 +4184,15 @@ function cathedral(o = {}) {
   const E = new Map(), q = [];
   for (const [x, z] of cells) {
     const zc = zone(x, z); if (zc !== I && zc !== O && zc !== C) continue;
-    if (N4.some(([dx, dz]) => top(x + dx, z + dz) < TOP[zc])) { E.set(x + ',' + z, 1); q.push([x, z]); }
+    if (N4.some(([dx, dz]) => (x > xE || !dx) && top(x + dx, z + dz) < TOP[zc])) { E.set(x + ',' + z, 1); q.push([x, z]); }   // slopes start at the side walls (not at the west or east ends)
   }
   for (let i = 0; i < q.length; i++) {
     const [x, z] = q[i], e = E.get(x + ',' + z);
-    for (const [dx, dz] of N4) { const k = (x + dx) + ',' + (z + dz); if (zone(x + dx, z + dz) === zone(x, z) && !E.has(k)) { E.set(k, e + 1); q.push([x + dx, z + dz]); } }
+    for (const [dx, dz] of N4) { const k = (x + dx) + ',' + (z + dz), zn = zone(x + dx, z + dz), zc = zone(x, z); if ((zn === zc || (zn && zn !== H && zn !== T && zc !== C && zn !== C && TOP[zn] === TOP[zc])) && !E.has(k)) { E.set(k, e + 1); q.push([x + dx, z + dz]); } }   // aisles of equal height share one slope
   }
   for (const [x, z] of cells) {
     const e = E.get(x + ',' + z); if (!e) continue;
+    if (terrace) { const y = TOP[zone(x, z)] + 1, edgeC = N4.some(([dx, dz]) => top(x + dx, z + dz) < TOP[zone(x, z)]); S.set(x, y, z, edgeC ? ((x + z) % 2 ? post() : B(SM.block)) : slab(SM.slab)); RH.set(x + ',' + z, y + 1); continue; }
     const y = TOP[zone(x, z)] + 1 + ((e - 1) >> 1), tp = (e - 1) & 1 ? 'top' : 'bottom';
     S.set(x, y, z, slab(RM.slab, tp)); RH.set(x + ',' + z, y + 1);
   }
@@ -3594,10 +4201,12 @@ function cathedral(o = {}) {
   for (const [x, z] of cells) {
     if (zone(x, z) !== T) continue;
     if (!border.has(x + ',' + z)) { S.set(x, TT, z, B(WD.planks)); S.set(x, FT, z, B(WD.planks)); }
-    else if (N8.some(([dx, dz]) => !zone(x + dx, z + dz) || top(x + dx, z + dz) < TT) && (x + z) % 2 === 0) S.set(x, TT + 1, z, wallB(x, TT + 1, z));
+    else if (!detailed && N8.some(([dx, dz]) => !zone(x + dx, z + dz) || top(x + dx, z + dz) < TT) && (x + z) % 2 === 0) S.set(x, TT + 1, z, wallB(x, TT + 1, z));
   }
 
-  // ---- west front: the wall between the towers rises to FT ----
+  // ---- west front (simple): the wall between the towers rises to FT ----
+  const KY = Math.max(AH + 1, 10), GY = FT - 5;
+  if (!detailed) {
   for (let z = -hw; z <= hw; z++) {
     for (let y = 1; y <= FT; y++) S.set(0, y, z, wallB(0, y, z));
     if ((z + hw) % 2 === 0) S.set(0, FT + 1, z, wallB(0, FT + 1, z));
@@ -3618,17 +4227,18 @@ function cathedral(o = {}) {
   portal(0);
   const sideZ = s => towerC(s)[1];
   portal(sideZ(-1)); portal(sideZ(1));
+  }
   // gallery of kings: a ledge, a row of figures, a cornice, across the whole front
-  const KY = Math.max(AH + 1, 10);
-  if (p.kings) for (let z = -edge; z <= edge; z++) {
+  if (!detailed && p.kings) for (let z = -edge; z <= edge; z++) {
     S.set(-1, KY, z, slab(SM.slab, 'top'));
     if ((z + edge) % 2 === 0) { S.set(-1, KY + 1, z, post()); S.set(-1, KY + 2, z, post()); }
     S.set(-1, KY + 3, z, stair(SM.stairs, 'east'));
   }
   // open gallery high between the towers
-  const GY = FT - 5;
-  for (let z = -hw; z <= hw; z++) for (let y = GY; y <= GY + 2; y++) S.set(0, y, z, (z + hw) % 2 ? AIR : post());
-  for (let z = -hw; z <= hw; z++) S.set(-1, GY - 1, z, slab(SM.slab, 'top'));
+  if (!detailed) {
+    for (let z = -hw; z <= hw; z++) for (let y = GY; y <= GY + 2; y++) S.set(0, y, z, (z + hw) % 2 ? AIR : post());
+    for (let z = -hw; z <= hw; z++) S.set(-1, GY - 1, z, slab(SM.slab, 'top'));
+  }
 
   // ---- glass ----
   const glassColors = MS.glass ? MS.glass.colors : { colored: ['red', 'blue', 'yellow', 'purple', 'lime', 'light_blue'], blue: ['blue', 'light_blue', 'cyan'], amber: ['yellow', 'orange', 'brown'], clear: [null] }[p.glass] || [null];
@@ -3656,7 +4266,8 @@ function cathedral(o = {}) {
     for (let du = -Rr - 1; du <= Rr + 1; du++) for (let dy = -Rr - 1; dy <= Rr + 1; dy++) if (du * du + dy * dy <= (Rr + 1) * (Rr + 1) + 1 && !isWall(S.get(...at(du, yc + dy)))) return false;
     for (let du = -Rr - 1; du <= Rr + 1; du++) for (let dy = -Rr - 1; dy <= Rr + 1; dy++) {
       const qq = du * du + dy * dy, k = at(du, yc + dy);
-      if (qq === 0 || (Rr >= 4 && (du === 0 || dy === 0) && qq <= 4)) S.set(...k, B(SM.accent));   // hub (and short spokes on a big rose)
+      const rr = Math.sqrt(qq), ang = Math.atan2(dy, du), sp = Math.abs((((ang / (Math.PI / 4)) % 1) + 1) % 1 - 0.5);
+      if (qq === 0 || (Rr >= 4 && ((rr > 1.2 && sp > 0.4 && rr < Rr - 0.5) || (rr > Rr * 0.5 && rr < Rr * 0.5 + 1)))) S.set(...k, B(SM.accent));   // hub, eight spokes and an inner ring (four short spokes read as a cross)
       else if (qq <= Rr * Rr + 1) S.set(...k, pane(...k, ax));
       else if (qq <= (Rr + 1) * (Rr + 1) + 1) S.set(...k, TRIM);
     }
@@ -3675,7 +4286,7 @@ function cathedral(o = {}) {
     const yc = p.rose ? tryRose(xcm, ze, true, NT, NT - 6, Rr) : null;
     lancet(xcm, ze, true, 2, (yc ? yc - Rr - 3 : NT - 3));
   }
-  if (p.rose) {                                          // west rose between the kings and the high gallery
+  if (p.rose && !detailed) {                             // west rose between the kings and the high gallery
     const lo = (p.kings ? KY + 4 : 10), Rr = Math.max(2, Math.min(4, hw - 1, ((GY - lo) >> 1) - 2));
     tryRose(0, 0, false, Math.round((lo + GY) / 2), lo + Rr + 1, Rr);
   }
@@ -3696,8 +4307,8 @@ function cathedral(o = {}) {
   }
 
   // ---- flying buttresses: a pier with a pinnacle outside the aisles, an arch of stone up to the clerestory ----
-  let nf = 0;
-  if (p.flying_buttresses) {
+  let nf = 0; const FLY = [];
+  if (p.flying_buttresses && !detailed) {   // the detailed cathedral draws its flyers with gothicFlyer (after the walls)
     const yp = Math.max(IRT, OT + 1 + lean(AW)) + 2, yw = NT - 2;
     for (let xb = 0; xb <= xE; xb += bay) {
       if (xb < TL + 1 || inCross(xb)) continue;
@@ -3706,7 +4317,8 @@ function cathedral(o = {}) {
         if (zone(xb, z1) || zone(xb, z2) || S.has(xb, 1, z1) || S.has(xb, 1, z2)) continue;
         for (let y = 0; y <= yp; y++) { S.set(xb, y, z1, B(y ? SM.block : WM.plinth)); S.set(xb, y, z2, B(y ? SM.block : WM.plinth)); }
         S.set(xb, yp + 1, z1, stair(SM.stairs, s > 0 ? 'north' : 'south'));
-        if (p.pinnacles) { S.set(xb, yp + 1, z2, post()); S.set(xb, yp + 2, z2, post()); S.set(xb, yp + 3, z2, post()); }
+        if (p.pinnacles && detailed) FLY.push([xb, yp + 1, z2]);   // a proper pinnacle goes on later (gothicPinnacleAt)
+        else if (p.pinnacles) { S.set(xb, yp + 1, z2, post()); S.set(xb, yp + 2, z2, post()); S.set(xb, yp + 3, z2, post()); }
         else S.set(xb, yp + 1, z2, stair(SM.stairs, s > 0 ? 'north' : 'south'));
         let py = yp;
         for (let a = edge; a >= hw + 1; a--) {
@@ -3714,6 +4326,7 @@ function cathedral(o = {}) {
           let y = Math.round(yp + (yw - yp) * t);
           const rh = RH.get(xb + ',' + z); if (rh !== undefined) y = Math.max(y, Math.ceil(rh));
           for (let yy = Math.min(py + 1, y); yy <= y; yy++) if (!/pane/.test(S.get(xb, yy, z) || '')) S.set(xb, yy, z, B(SM.block));
+          if (y > py && !S.has(xb, py, z)) S.set(xb, py, z, stair(SM.stairs, s > 0 ? 'south' : 'north', 'top'));   // join each step of the arch to the one below it
           py = y;
         }
         nf++;
@@ -3722,7 +4335,7 @@ function cathedral(o = {}) {
   }
 
   // ---- towers: tall belfry openings on every face, a bell ----
-  for (const s of [-1, 1]) {
+  if (!detailed) for (const s of [-1, 1]) {
     const faces = [[[0, s * (hw + 1)], [0, s * edge]], [[TL - 1, s * (hw + 1)], [TL - 1, s * edge]], [[0, s * edge], [TL - 1, s * edge]], [[0, s * (hw + 1)], [TL - 1, s * (hw + 1)]]];
     for (const [[ax0, az0], [ax1, az1]] of faces) {
       const len = Math.max(Math.abs(ax1 - ax0), Math.abs(az1 - az0)) + 1, k = Math.max(1, Math.floor(len / 3));
@@ -3738,7 +4351,8 @@ function cathedral(o = {}) {
 
   // ---- flèche over the crossing: an open drum, then a needle ----
   let fTop = 0;
-  if (p.fleche && hasT) {
+  const crossing = !p.fleche || !hasT ? 'none' : (CATHEDRAL_CROSSINGS[p.crossing] ? p.crossing : 'fleche');
+  if (crossing === 'fleche' || (crossing !== 'none' && !detailed)) {
     const y0 = ridge, Hf = R.fleche_height, n = Hf - 6;
     for (let y = y0; y < y0 + 6; y++) for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
       const corner = dx && dz, mid = !dx && !dz;
@@ -3755,6 +4369,113 @@ function cathedral(o = {}) {
     S.set(xcm, y, 0, post({ north: 'low', south: 'low' })); S.set(xcm, y, -1, post({ up: false, south: 'low' })); S.set(xcm, y, 1, post({ up: false, north: 'low' }));
     S.set(xcm, y + 1, 0, post()); S.set(xcm, y + 2, 0, B('lightning_rod', { facing: 'up', powered: false, waterlogged: false }));
     fTop = y + 3;
+  }
+
+  // ---- detailed west front ----
+  let GF = null;
+  if (detailed) {
+    const FM = { ...(GOTHIC_FACADE_MATS[p.walls] || GOTHIC_FACADE_MATS.white) };
+    if (MS.stone) Object.assign(FM, { frame: MS.stone.block, stairs: MS.stone.stairs, slab: MS.stone.slab, wall: MS.stone.wall || FM.wall });
+    const fo = { ...FM, checkA: p.walls === 'warm' ? 'cut_red_sandstone' : FM.frame, checkB: p.walls === 'warm' ? 'smooth_sandstone' : FM.niche, seed, rose: !!p.rose, kings: !!p.kings, statues: p.statues !== false, pinnacles: !!p.pinnacles, forest: !!p.pinnacles && !!p.pinnacle_forest, orders: R.portal_orders, door: WD.door.replace('_door', '_planks'), doorBack: WD.planks,
+      infill: (x, y, z) => wallB(x, y, z), pane: (x, y, z, ax) => pane(x, y, z, ax) };
+    if (screen) GF = gothicScreen(S, { hw, NA, AW, edge, NT, IT, OT, ridge, flat: terrace }, fo);
+    else GF = gothicFront(S, GL, { ...fo, towerTop: p.tower_top });
+    let st = GF.statues, pn = GF.pins;
+    const XM = { frame: FM.frame, stairs: FM.stairs, slab: FM.slab, wall: FM.wall };
+    if (!screen && p.tower_top === 'openwork') for (const s of [-1, 1]) {          // Cologne: an openwork spire on each tower
+      const cx = Math.floor((TL - 1) / 2), R0 = Math.max(2, Math.min(GL.th + 1, cx));
+      fTop = Math.max(fTop, gothicSpire(S, XM, cx, TT + 1, s * GL.tc, R0, R0 * 10, 'open', GF.mine, null, R0 * 2 + 2));
+      for (const [dx, dz] of [[-R0 - 1, -R0 - 1], [-R0 - 1, R0 + 1], [R0 + 1, -R0 - 1], [R0 + 1, R0 + 1]]) { gothicPinnacleAt(S, fo, cx + dx, TT + 1, s * GL.tc + dz, 4, false, GF.mine); pn++; }
+    }
+    if (crossing === 'turret') fTop = gothicSpire(S, { frame: 'oxidized_cut_copper', stairs: 'oxidized_cut_copper_stairs', slab: 'oxidized_cut_copper_slab', wall: 'prismarine_wall' }, xcm, ridge - 2, 0, 3, R.fleche_height, 'open', GF.mine, null, 7);   // an open copper stage, then the needle
+    if (crossing === 'lantern') fTop = gothicLantern(S, XM, xcm, NT + 1, 0, Math.max(3, Math.min(hw - 1, 7)), ridge - NT + 6, R.fleche_height, GF.mine, (x, y, z, ax) => pane(x, y, z, ax));
+    if (crossing === 'cimborio') {                       // Seville: the crossing raised as a lit square box with a balustrade
+      const h0 = NT + 1, h1 = NT + 9;
+      for (let x = xc0; x <= xc1; x++) for (let z = -hw; z <= hw; z++) {
+        const e = x === xc0 || x === xc1 || Math.abs(z) === hw;
+        if (e) for (let y = h0; y <= h1; y++) { const win = y >= h0 + 2 && y <= h1 - 2 && ((Math.abs(z) === hw && (x - xc0) % 3 === 1) || ((x === xc0 || x === xc1) && (z + hw) % 3 === 1)); S.set(x, y, z, win ? pane(x, y, z, Math.abs(z) === hw ? 'x' : 'z') : B(FM.frame)); GF.mine.add(x + ',' + y + ',' + z); }
+        S.set(x, h1 + 1, z, e ? ((x + z) % 2 ? post() : B(FM.frame)) : slab(SM.slab)); GF.mine.add(x + ',' + (h1 + 1) + ',' + z);
+      }
+      for (const [x, z] of [[xc0, -hw], [xc0, hw], [xc1, -hw], [xc1, hw]]) { gothicPinnacleAt(S, fo, x, h1 + 2, z, 3, false, GF.mine); pn++; }
+      fTop = Math.max(fTop, h1 + 6);
+    }
+    if (p.campanile) {                                    // Seville: the Giralda, free-standing north of the east end
+      const n = Math.max(7, Math.round(W * 0.6)) | 1, H2 = Math.round(NT * 2.1), x0 = (hasT ? xc1 + 3 : xE - n - 4), z0 = -(edge + 7 + n);
+      fTop = Math.max(fTop, gothicCampanile(S, { ...FM, brick: 'bricks', brickWall: 'brick_wall' }, x0, z0, n, H2, GF.mine));
+      report.push(`独立钟楼：${n}×${n}，高 ${H2}`);
+    }
+    if (p.court) {                                         // Seville: the court of oranges, north of the nave
+      const x0 = 2, x1 = Math.max(x0 + 12, (hasT ? xc0 : xE - 16) - 3), z1 = -(edge + 7), z0 = z1 - 22;
+      gothicCourt(S, FM, x0, x1, z0, z1, GF.mine);
+      report.push(`橘树庭院：${x1 - x0 + 1}×${z1 - z0 + 1}`);
+    }
+    if (!screen && TL >= 8) for (const s of [-1, 1]) { const r = gothicTowerSide(S, GL, fo, s, edge, 4, TL - 1, GF.mine); st += r.statues; pn += r.pins; }
+    // aisle walls of the nave and the choir, and the transept fronts below their roses
+    const vSide = NA === 2 ? OT : IT, eastX = east === 'flat' ? xE : xE - 1;
+    for (const s of [-1, 1]) {
+      gothicSideWall(S, fo, s, edge, TL + 1, hasT ? xc0 - 2 : eastX, bay, vSide, GF.mine);
+      if (hasT && xc1 + 2 < eastX) gothicSideWall(S, fo, s, edge, xc1 + 2, eastX, bay, vSide, GF.mine);
+      if (hasT && tdep >= 0) { const r = gothicTransept(S, { ...fo, bigWindow: !p.rose }, s, edge + tdep, xc0, xc1, p.rose ? Math.max(8, NT - 2 * Math.max(2, Math.min(4, hw - 1)) - 9) : NT, GF.mine, NT, ridge); st += r.statues;
+        if (tdep >= 1) for (const [sx, xf] of [[-1, xc0], [1, xc1]]) gothicShortWall(S, fo, sx, xf, s * (edge + 1), s * (edge + tdep - 1), vSide, GF.mine); }
+    }
+    // clerestory: piers where the flyers land, a lancet per bay (no clearing: the flyers and aisle roofs are in front)
+    const fc = { ...fo, clear: false };
+    for (const s of [-1, 1]) {
+      gothicSideWall(S, fc, s, hw, TL + 1, hasT ? xc0 - 2 : xE, bay, NT, GF.mine, IRT + 1);
+      if (hasT && xc1 + 2 < xE) gothicSideWall(S, fc, s, hw, xc1 + 2, xE, bay, NT, GF.mine, IRT + 1);
+    }
+    if (p.flying_buttresses) {
+      const yp = Math.max(IRT, OT + 1 + lean(AW)) + 2, yw = NT - 2, fl = { ...fo, plinth: WM.plinth, pinnacles: true };
+      for (let xb = 0; xb <= xE; xb += bay) {
+        if (xb < TL + 1 || inCross(xb)) continue;
+        for (const s of [-1, 1]) { if (zone(xb, s * (edge + 1)) || zone(xb, s * (edge + 3))) continue; gothicFlyer(S, fl, s, xb, edge, yp, hw + 1, yw, RH, GF.mine, fo.forest && NA === 2 ? hw + AW : null); nf++; pn++; }
+      }
+    }
+    // east end: a stepped pier with a pinnacle between every two radiating chapels (or round the apse)
+    if (east !== 'flat') {
+      const rOut = east === 'chevet' ? (NA === 2 ? edge : hw + AW) : hw, nP = east === 'chevet' ? Math.max(2, nch + 1) : 5, top = east === 'chevet' ? (NA === 2 ? OT : IT) : NT;
+      for (let k = 0; k < nP; k++) {
+        const a = -Math.PI / 2 + Math.PI * k / (nP - 1);
+        for (const rr of [rOut + 1, rOut + 2]) {
+          const x = xE + Math.round(Math.cos(a) * rr), z = Math.round(Math.sin(a) * rr);
+          if (x <= xE || zone(x, z) || S.has(x, 2, z)) continue;
+          const h = rr === rOut + 1 ? top : top - 4;
+          for (let y = 0; y <= h; y++) S.set(x, y, z, B(y ? FM.frame : WM.plinth));
+          if (rr === rOut + 2) { gothicPinnacleAt(S, fo, x, h + 1, z, 2, false, GF.mine); pn++; }
+          else { gothicPinnacleAt(S, fo, x, h + 1, z, 3, true, GF.mine); pn++; }
+        }
+        if (east !== 'chevet' || !p.flying_buttresses) continue;
+        // a flyer from the inner pier up to the apse's high wall, and a pilaster on that wall where it lands
+        const y0 = top + 1, y1 = NT - 2; let py = null, pxz = null;
+        for (let rr = rOut; rr >= hw + 1; rr--) {
+          const x = xE + Math.round(Math.cos(a) * rr), z = Math.round(Math.sin(a) * rr);
+          if (x <= xE) { py = null; pxz = null; continue; }
+          let y = Math.round(y0 + (y1 - y0) * (rOut - rr) / Math.max(1, rOut - hw - 1));
+          const rh = RH.get(x + ',' + z); if (rh !== undefined) y = Math.max(y, Math.ceil(rh));
+          const col = (cx, cz, ya, yb) => { for (let yy = ya; yy <= yb; yy++) if (!/pane/.test(S.get(cx, yy, cz) || '')) { S.set(cx, yy, cz, B(FM.frame)); GF.mine.add(cx + ',' + yy + ',' + cz); } };
+          if (pxz && pxz[0] !== x && pxz[1] !== z) col(pxz[0], z, Math.min(py, y), Math.max(py, y));   // a diagonal step: fill the corner so the arch stays joined
+          col(x, z, py === null ? y : Math.min(py, y), y);
+          py = y; pxz = [x, z];
+        }
+        const xw = xE + Math.round(Math.cos(a) * (hw + 1)), zw = Math.round(Math.sin(a) * (hw + 1));
+        if (xw > xE) for (let y = IRT + 1; y <= NT; y++) if (!S.has(xw, y, zw)) { S.set(xw, y, zw, B(FM.frame)); GF.mine.add(xw + ',' + y + ',' + zw); }
+        if (xw > xE && fo.forest) { gothicPinnacleAt(S, fo, xw, NT + 1, zw, 4, true, GF.mine); pn++; }   // Cologne: a big pinnacle over every pilaster of the choir
+      }
+    }
+    for (const [x, z] of cells) {                 // chapels: a frame plinth and an overhanging cornice
+      if (zone(x, z) !== C || !border.has(x + ',' + z)) continue;
+      for (const [dx, dz] of N4) if (!zone(x + dx, z + dz)) {
+        if (!S.has(x + dx, 1, z + dz)) S.set(x + dx, 1, z + dz, stair(FM.stairs, DIR(-dx, -dz)));
+        if (!S.has(x + dx, CT, z + dz)) S.set(x + dx, CT, z + dz, stair(FM.stairs, DIR(-dx, -dz), 'top'));
+      }
+    }
+    for (const k of GF.mine) {                     // anything of ours standing on a bottom slab would hover half a block: make that slab a full block
+      const b = S.blocks.get(k); if (!b || /_slab|_stairs|end_rod|_pane/.test(b)) continue;
+      const [x, y, z] = k.split(',').map(Number), u = S.get(x, y - 1, z);
+      if (u && /_slab\[.*type=bottom/.test(u)) S.set(x, y - 1, z, B(FM.frame));
+    }
+    const nfl = gothicDropFloating(S, GF.mine);
+    report.push(`${screen ? '屏风立面' : '精细西立面'}：宽 ${GF.width}，${st} 座雕像、${pn} 座小尖塔`);
   }
 
   // ---- inside (off by default): altar in the apse, choir stalls, hanging lanterns ----
@@ -3775,7 +4496,7 @@ function cathedral(o = {}) {
     (hasT ? `；耳堂伸出侧廊外 ${tdep} 格` : '') + `；唱诗堂 ${CB} 开间；东端${CATHEDRAL_EAST[east]}` + (nch ? `（${nch} 个小礼拜堂）` : '') +
     `；剖面：拱廊 ${AH}` + (GH ? ` + 楼廊 ${GH}` : '') + ` + 高侧窗 ${CH}，中殿墙高 ${NT}、屋脊 ${ridge}；西立面高 ${FT}，双塔高 ${TT}` + (fTop ? `，交叉处尖塔顶 ${fTop}` : '') +
     `；窗 ${nw} 扇、玫瑰窗 ${roses} 扇、飞扶壁 ${nf} 道；总尺寸 ${bx1 - bx0 + 1}×${bz1 - bz0 + 1}，高 ${by1 + 1}` + (p.interior ? '；内部有祭坛、唱诗席' : ''));
-  const spec = { ...p, ...R, width: W, aisles: NA, east_end: east, chapels: nch || R.chapels };
+  const spec = { ...p, ...R, facade: detailed ? 'detailed' : 'simple', width: W, aisles: NA, east_end: east, chapels: nch || R.chapels };
   return { S, foot: [bx0, bx1, bz0, bz1], tags: ['landmark', 'cathedral'], report, spec, adjust };
 }
 
@@ -5672,6 +6393,6 @@ function applyZones(T, zones, c) {
   return out;
 }
 
-const api = { initData, LANDMARK_PLACE, generate, WINDOW_MATERIALS, WINDOW_VARIANTS, WINDOW_COLORS, windowChoice, applyWindowMaterial, schemNBT, solve, buildHouse, applyColors, Structure, HouseBuilder, currentRoles, STYLES, CURVES, MIX_DEFAULT, PLAN_LABEL, FUNCTION_LABEL, ANNEX_LABEL, ROOF_STYLES, DORMER_STYLES, SUPPORTED, synthTerrain, Terrain, PROPS, lampPost, tree, well, placeProp, checkPlacement, plaza, LANDMARKS, PLAZA_SHAPES, PLAZA_PATTERNS, PLAZA_CENTERS, PLAZA_PAVING, stall, STALL_ROOFS, fountainProp, church, CHURCH_KINDS, cathedral, CATHEDRAL_STYLES, CATHEDRAL_EAST, CATHEDRAL_DEFAULT, CATHEDRAL_BASE, CATHEDRAL_RANGES, CHURCH_MAT_SLOTS, MAT_KINDS, matBlocks, matGlassList, resolveMats, TOWER_POS, CHURCH_SIDES, CHURCH_PORCH, CHURCH_WALLS, CHURCH_ROOFS, TOWER_TOPS, ROOF_PITCHES, SPIRE_HEIGHTS, CHURCH_WINDOWS, monument, MONUMENT_TYPES, MONUMENT_TOPS, RIBBONS, FOUNTAIN_SHAPES, FOUNTAIN_RIMS, FOUNTAIN_TOPS, FOUNTAIN_MATERIALS, STALL_WARES, STALL_COLORS, PLAZA_TREE_LAYOUTS, street, ROAD_KINDS, BRIDGE_STYLES, ROAD_CURVES, curvePoints, town, composeTown, planDistrict, districtGrid, zoneMask, maskOutline, shapesMask, rectPoly, ellipsePoly, edgeCost, liveWire, SEL_SHAPES, SEL_OPS, DISTRICT_STYLES, DISTRICT_DENSITY, DISTRICT_LANDMARKS, DISTRICT_TIERS, HOUSE_SIZES, cloneTerrain, retouchTown, emptyScene, fixConnections, stairShapes, rotQuarter, _py: { PyRandom, deriveSeed, _h, pyRound, fmt } };
+const api = { initData, LANDMARK_PLACE, generate, WINDOW_MATERIALS, WINDOW_VARIANTS, WINDOW_COLORS, windowChoice, applyWindowMaterial, schemNBT, solve, buildHouse, applyColors, Structure, HouseBuilder, currentRoles, STYLES, CURVES, MIX_DEFAULT, PLAN_LABEL, FUNCTION_LABEL, ANNEX_LABEL, ROOF_STYLES, DORMER_STYLES, SUPPORTED, synthTerrain, Terrain, PROPS, lampPost, tree, well, placeProp, checkPlacement, plaza, LANDMARKS, PLAZA_SHAPES, PLAZA_PATTERNS, PLAZA_CENTERS, PLAZA_PAVING, stall, STALL_ROOFS, fountainProp, church, CHURCH_KINDS, cathedral, CATHEDRAL_STYLES, CATHEDRAL_PRESETS, CATHEDRAL_TOWER_TOPS, CATHEDRAL_CROSSINGS, CATHEDRAL_ROOF_STYLES, CATHEDRAL_FACADES, CATHEDRAL_EAST, CATHEDRAL_DEFAULT, CATHEDRAL_BASE, CATHEDRAL_RANGES, CHURCH_MAT_SLOTS, MAT_KINDS, matBlocks, matGlassList, resolveMats, TOWER_POS, CHURCH_SIDES, CHURCH_PORCH, CHURCH_WALLS, CHURCH_ROOFS, TOWER_TOPS, ROOF_PITCHES, SPIRE_HEIGHTS, CHURCH_WINDOWS, monument, MONUMENT_TYPES, MONUMENT_TOPS, RIBBONS, FOUNTAIN_SHAPES, FOUNTAIN_RIMS, FOUNTAIN_TOPS, FOUNTAIN_MATERIALS, STALL_WARES, STALL_COLORS, PLAZA_TREE_LAYOUTS, street, ROAD_KINDS, BRIDGE_STYLES, ROAD_CURVES, curvePoints, town, composeTown, planDistrict, districtGrid, zoneMask, maskOutline, shapesMask, rectPoly, ellipsePoly, edgeCost, liveWire, SEL_SHAPES, SEL_OPS, DISTRICT_STYLES, DISTRICT_DENSITY, DISTRICT_LANDMARKS, DISTRICT_TIERS, HOUSE_SIZES, cloneTerrain, retouchTown, emptyScene, fixConnections, stairShapes, rotQuarter, _py: { PyRandom, deriveSeed, _h, pyRound, fmt } };
 if (typeof module === 'object' && module.exports) module.exports = api; else root.MCGen = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
