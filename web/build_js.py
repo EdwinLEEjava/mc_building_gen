@@ -7,7 +7,7 @@ from mcgen.house import DEFAULT_SPEC
 from mcgen.colors import OPTIONS, WORDS, BLOCKS
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ORDER = ["py.js", "core.js", "house.js", "layout.js", "api.js", "terrain.js", "props.js", "stall.js", "fountain.js", "monument.js", "matslots.js", "church.js", "cathedral.js", "landmark.js", "site.js", "district.js", "town.js"]
+ORDER = ["py.js", "core.js", "house.js", "layout.js", "api.js", "terrain.js", "props.js", "stall.js", "fountain.js", "monument.js", "matslots.js", "church.js", "gothic.js", "gothic_styles.js", "cathedral.js", "landmark.js", "site.js", "district.js", "town.js"]
 
 
 def data():
@@ -24,7 +24,7 @@ def bundle():
             "(function (root) {\n'use strict';\n" + src +
             "\nconst api = { initData, LANDMARK_PLACE, generate, WINDOW_MATERIALS, WINDOW_VARIANTS, WINDOW_COLORS, windowChoice, applyWindowMaterial, schemNBT, solve, buildHouse, applyColors, Structure, HouseBuilder, currentRoles,"
             " STYLES, CURVES, MIX_DEFAULT, PLAN_LABEL, FUNCTION_LABEL, ANNEX_LABEL, ROOF_STYLES, DORMER_STYLES, SUPPORTED,"
-            " synthTerrain, Terrain, PROPS, lampPost, tree, well, placeProp, checkPlacement, plaza, LANDMARKS, PLAZA_SHAPES, PLAZA_PATTERNS, PLAZA_CENTERS, PLAZA_PAVING, stall, STALL_ROOFS, fountainProp, church, CHURCH_KINDS, cathedral, CATHEDRAL_STYLES, CATHEDRAL_EAST, CATHEDRAL_DEFAULT, CATHEDRAL_BASE, CATHEDRAL_RANGES, CHURCH_MAT_SLOTS, MAT_KINDS, matBlocks, matGlassList, resolveMats, TOWER_POS, CHURCH_SIDES, CHURCH_PORCH, CHURCH_WALLS, CHURCH_ROOFS, TOWER_TOPS, ROOF_PITCHES, SPIRE_HEIGHTS, CHURCH_WINDOWS, monument, MONUMENT_TYPES, MONUMENT_TOPS, RIBBONS, FOUNTAIN_SHAPES, FOUNTAIN_RIMS, FOUNTAIN_TOPS, FOUNTAIN_MATERIALS, STALL_WARES, STALL_COLORS, PLAZA_TREE_LAYOUTS, street, ROAD_KINDS, BRIDGE_STYLES, ROAD_CURVES, curvePoints, town, composeTown, planDistrict, districtGrid, zoneMask, maskOutline, shapesMask, rectPoly, ellipsePoly, edgeCost, liveWire, SEL_SHAPES, SEL_OPS, DISTRICT_STYLES, DISTRICT_DENSITY, DISTRICT_LANDMARKS, DISTRICT_TIERS, HOUSE_SIZES, cloneTerrain, retouchTown, emptyScene, fixConnections, stairShapes, rotQuarter,"
+            " synthTerrain, Terrain, PROPS, lampPost, tree, well, placeProp, checkPlacement, plaza, LANDMARKS, PLAZA_SHAPES, PLAZA_PATTERNS, PLAZA_CENTERS, PLAZA_PAVING, stall, STALL_ROOFS, fountainProp, church, CHURCH_KINDS, cathedral, CATHEDRAL_STYLES, CATHEDRAL_PRESETS, CATHEDRAL_TOWER_TOPS, CATHEDRAL_CROSSINGS, CATHEDRAL_ROOF_STYLES, CATHEDRAL_FACADES, CATHEDRAL_EAST, CATHEDRAL_DEFAULT, CATHEDRAL_BASE, CATHEDRAL_RANGES, CHURCH_MAT_SLOTS, MAT_KINDS, matBlocks, matGlassList, resolveMats, TOWER_POS, CHURCH_SIDES, CHURCH_PORCH, CHURCH_WALLS, CHURCH_ROOFS, TOWER_TOPS, ROOF_PITCHES, SPIRE_HEIGHTS, CHURCH_WINDOWS, monument, MONUMENT_TYPES, MONUMENT_TOPS, RIBBONS, FOUNTAIN_SHAPES, FOUNTAIN_RIMS, FOUNTAIN_TOPS, FOUNTAIN_MATERIALS, STALL_WARES, STALL_COLORS, PLAZA_TREE_LAYOUTS, street, ROAD_KINDS, BRIDGE_STYLES, ROAD_CURVES, curvePoints, town, composeTown, planDistrict, districtGrid, zoneMask, maskOutline, shapesMask, rectPoly, ellipsePoly, edgeCost, liveWire, SEL_SHAPES, SEL_OPS, DISTRICT_STYLES, DISTRICT_DENSITY, DISTRICT_LANDMARKS, DISTRICT_TIERS, HOUSE_SIZES, cloneTerrain, retouchTown, emptyScene, fixConnections, stairShapes, rotQuarter,"
             " _py: { PyRandom, deriveSeed, _h, pyRound, fmt } };\n"
             "if (typeof module === 'object' && module.exports) module.exports = api; else root.MCGen = api;\n"
             "})(typeof globalThis !== 'undefined' ? globalThis : this);\n")
