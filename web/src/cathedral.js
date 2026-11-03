@@ -30,7 +30,7 @@ const CATHEDRAL_EAST = { chevet: '回廊 + 放射小礼拜堂', apse: '半圆后
 const CATHEDRAL_DEFAULT = {
   style: 'french', facade: 'detailed', nave_bays: 9, bay: 8, width: 17, aisles: 2, aisle_width: 6, transept: true, transept_depth: 2, choir_bays: 4,
   east_end: 'chevet', chapels: 5, chapel_depth: 4, arcade_height: 12, gallery_height: 6, clerestory_height: 13, facade_extra: 2, tower_rise: 24,
-  rose: true, kings: true, statues: true, portal_orders: 6, flying_buttresses: true, flyer_levels: 1, gargoyles: true, louvers: true, dormers: false, pinnacles: true, fleche: true, fleche_height: 50, roof_pitch: 'medium',
+  rose: true, kings: true, statues: true, portal_orders: 6, flying_buttresses: true, flyer_levels: 1, louvers: true, dormers: false, pinnacles: true, fleche: true, fleche_height: 50, roof_pitch: 'medium',
   walls: 'white', roof: 'slate', glass: 'colored', interior: false, seed: 1,
 };
 // the French preset's sizes at 1 block per metre; the panel's 比例 multiplies these (bay counts stay)
@@ -338,7 +338,7 @@ function cathedral(o = {}) {
   }
 
   // ---- flying buttresses: a pier with a pinnacle outside the aisles, an arch of stone up to the clerestory ----
-  let nf = 0, nf2 = 0, ngar = 0; const FLY = [];
+  let nf = 0, nf2 = 0; const FLY = [];
   if (p.flying_buttresses && !detailed) {   // the detailed cathedral draws its flyers with gothicFlyer (after the walls)
     const yp = Math.max(IRT, OT + 1 + lean(AW)) + 2, yw = NT - 2;
     for (let xb = 0; xb <= xE; xb += bay) {
@@ -463,10 +463,10 @@ function cathedral(o = {}) {
       if (hasT && xc1 + 2 < xE) gothicSideWall(S, fc, s, hw, xc1 + 2, xE, bay, NT, GF.mine, IRT + 1);
     }
     if (p.flying_buttresses) {
-      const yp = Math.max(IRT, OT + 1 + lean(AW)) + 2, yw = NT - 2, fl = { ...fo, plinth: WM.plinth, pinnacles: true, flyerLevels: R.flyer_levels, wallLow: IRT, gargoyles: p.gargoyles !== false };
+      const yp = Math.max(IRT, OT + 1 + lean(AW)) + 2, yw = NT - 2, fl = { ...fo, plinth: WM.plinth, pinnacles: true, flyerLevels: R.flyer_levels, wallLow: IRT };
       for (let xb = 0; xb <= xE; xb += bay) {
         if (xb < TL + 1 || inCross(xb)) continue;
-        for (const s of [-1, 1]) { if (zone(xb, s * (edge + 1)) || zone(xb, s * (edge + 3))) continue; const fr = gothicFlyer(S, fl, s, xb, edge, yp, hw + 1, yw, RH, GF.mine, fo.forest && NA === 2 ? hw + AW : null); nf++; pn++; nf2 += fr.levels === 2; ngar += fr.gargoyles; }
+        for (const s of [-1, 1]) { if (zone(xb, s * (edge + 1)) || zone(xb, s * (edge + 3))) continue; const fr = gothicFlyer(S, fl, s, xb, edge, yp, hw + 1, yw, RH, GF.mine, fo.forest && NA === 2 ? hw + AW : null); nf++; pn++; nf2 += fr.levels === 2; }
       }
     }
     // east end: a stepped pier with a pinnacle between every two radiating chapels (or round the apse)
@@ -533,7 +533,7 @@ function cathedral(o = {}) {
   report.unshift(`主教座堂（${CATHEDRAL_STYLES[p.style] || CATHEDRAL_STYLES.french}）：中殿 ${NB} 开间 × ${bay} 格、宽 ${W}；每侧侧廊 ${NA} 条（各宽 ${AW}）` +
     (hasT ? `；耳堂伸出侧廊外 ${tdep} 格` : '') + `；唱诗堂 ${CB} 开间；东端${CATHEDRAL_EAST[east]}` + (nch ? `（${nch} 个小礼拜堂）` : '') +
     `；剖面：拱廊 ${AH}` + (GH ? ` + 楼廊 ${GH}` : '') + ` + 高侧窗 ${CH}，中殿墙高 ${NT}、屋脊 ${ridge}；西立面高 ${FT}，双塔高 ${TT}` + (fTop ? `，交叉处尖塔顶 ${fTop}` : '') +
-    `；窗 ${nw} 扇、玫瑰窗 ${roses} 扇、飞扶壁 ${nf} 道` + (nf2 ? `（其中 ${nf2} 道双层）` : '') + (ngar ? `、滴水兽 ${ngar} 个` : '') + (ndorm ? `、老虎窗 ${ndorm} 个` : '') + `；总尺寸 ${bx1 - bx0 + 1}×${bz1 - bz0 + 1}，高 ${by1 + 1}` + (p.interior ? '；内部有祭坛、唱诗席' : ''));
+    `；窗 ${nw} 扇、玫瑰窗 ${roses} 扇、飞扶壁 ${nf} 道` + (nf2 ? `（其中 ${nf2} 道双层）` : '') + (ndorm ? `、老虎窗 ${ndorm} 个` : '') + `；总尺寸 ${bx1 - bx0 + 1}×${bz1 - bz0 + 1}，高 ${by1 + 1}` + (p.interior ? '；内部有祭坛、唱诗席' : ''));
   const spec = { ...p, ...R, facade: detailed ? 'detailed' : 'simple', width: W, aisles: NA, east_end: east, chapels: nch || R.chapels };
   return { S, foot: [bx0, bx1, bz0, bz1], tags: ['landmark', 'cathedral'], report, spec, adjust };
 }
