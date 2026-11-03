@@ -10,13 +10,19 @@
 // nave / aisle width gives a consistent front; parts that do not fit shrink (fewer arch orders) or drop.
 // gothicFrontLayout(...) runs first so the cathedral can raise its towers to the facade's tower top.
 // ---------------------------------------------------------------------------------------------
-function gothicArchIn(du, v, w, v0, hs) {           // inside a pointed (equilateral) arch: width w, springing at hs
+// arch shape for the whole building being generated: 'pointed' (Gothic, equilateral) or 'round' (Romanesque, a half
+// circle). The cathedral sets it before building and puts it back afterwards (gothicWithArch), so every part — doors,
+// windows, belfries, the facade's storey heights — follows it without passing it through each call.
+let _gothicArch = 'pointed';
+function gothicWithArch(shape, f) { const old = _gothicArch; _gothicArch = shape === 'round' ? 'round' : 'pointed'; try { return f(); } finally { _gothicArch = old; } }
+function gothicArchIn(du, v, w, v0, hs) {           // inside the arch: width w, springing at hs
   const a = w / 2, x = Math.abs(du);
   if (x > a - 0.5 || v < v0) return false;
   if (v <= hs) return true;
+  if (_gothicArch === 'round') return (v - hs) * (v - hs) + x * x <= (a - 0.5) * (a - 0.5) + 0.6;
   return v + 0.5 <= hs + Math.sqrt(Math.max(0, w * w - (x + a) * (x + a))) + 0.35;
 }
-const gothicArchTop = (w, hs) => hs + Math.floor(Math.sqrt(3) * w / 2);
+const gothicArchTop = (w, hs) => hs + (_gothicArch === 'round' ? Math.max(0, Math.floor(w / 2 - 0.5)) : Math.floor(Math.sqrt(3) * w / 2));
 // facade materials per wall style (frame, stairs, slab, wall post, statue head, capital, niche back)
 const GOTHIC_FACADE_MATS = {
   white: { frame: 'polished_diorite', stairs: 'polished_diorite_stairs', slab: 'polished_diorite_slab', wall: 'diorite_wall', head: 'calcite', capital: 'chiseled_stone_bricks', niche: 'smooth_stone' },
@@ -118,15 +124,16 @@ function gothicKit(S, o, W, dir, ax, mine) {
       if (inSub || oc) { setD(uc + du, v, dIn - 1, 'glass'); HOLE.set(k2(uc + du, v), 'glass'); }
     }
     const gb = AT(w, hs) - 1, a = w >> 1;
+    if (_gothicArch === 'round') return;               // Romanesque: no gablet over the window
     for (let v = gb; v <= Math.min(gb + a + 2, vMax); v++) for (let du = -a; du <= a; du++) if (v <= gb + a + 2 - Math.round(Math.abs(du) * (a + 2) / a) && (free || getD(uc + du, v) !== undefined) && !HOLE.has(k2(uc + du, v))) setD(uc + du, v, Math.max(getD(uc + du, v) ?? base + 1, base + 1), 'frame');
     if (gb + a + 4 <= vMax) ATT.push(() => { put(uc, gb + a + 3, base + 1, post()); put(uc, gb + a + 4, base + 1, rod()); });
   };
   K.portal = (uc, w, hs, orders, base, isBut, vMax = Infinity) => {   // vMax: the gable and its finial stay below this row
-    const a = w >> 1, top = gothicArchTop(w, hs), gTop = Math.max(top + 1, Math.min(top + a + 6, vMax - 3));
+    const a = w >> 1, top = gothicArchTop(w, hs), gTop = _gothicArch === 'round' ? top + 1 : Math.max(top + 1, Math.min(top + a + 6, vMax - 3));
     for (let v = 0; v <= gTop; v++) for (let du = -a - 1; du <= a + 1; du++) {
       const u = uc + du, au = Math.abs(du);
       if (isBut(Math.abs(u), u)) continue;
-      const inGable = v >= hs && v <= gTop - Math.round(au * (gTop - hs) / (a + 1));
+      const inGable = _gothicArch !== 'round' && v >= hs && v <= gTop - Math.round(au * (gTop - hs) / (a + 1));
       if (gothicArchIn(du, v, w + 2, 0, hs) || inGable) setD(u, v, base, 'frame', inGable && v > top);
       for (let k = 0; k <= orders; k++) if (gothicArchIn(du, v, w - 2 * k, 0, hs)) setD(u, v, base - 1 - k, k === orders ? 'infill' : 'frame');
     }
@@ -141,6 +148,7 @@ function gothicKit(S, o, W, dir, ax, mine) {
         for (let v = 1; v < hs - 1; v++) put(u, v, d, post());
         put(u, hs - 1, d, B(o.capital)); if (k % 2 === 0 && hs > 6) put(u, 5, d, B(o.head));
       }
+      if (_gothicArch === 'round') return;                              // Romanesque: no gable
       for (let du = -a - 1; du <= a + 1; du++) {                        // crockets up the gable, finial on top
         const au = Math.abs(du), v = gTop - Math.round(au * (gTop - hs) / (a + 1));
         if (au % 2 === 1 && au <= a) put(uc + du, v + 1, base, st(FST, du < 0 ? dir.up : dir.un));

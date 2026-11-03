@@ -197,3 +197,33 @@ function gothicCourt(S, o, x0, x1, z0, z1, mine) {
   for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) put(cx + a, 1, cz + b, a || b ? B(o.frame) : B('water', { level: 0 }));   // a basin with one source in the middle
   put(cx, 0, cz, B(o.frame));
 }
+// A square tower over the crossing (Romanesque; English Gothic, e.g. Lincoln, Salisbury). Four faces built with the
+// facade kit (so windows follow the building's arch shape): corner piers, two windows on each face above the roofs,
+// a cornice and an open parapet. With spireH > 0 an octagonal stone spire stands inside the parapet.
+// x0..x1 × -hw..hw: the crossing square; v0: where the tower walls start (on the nave wall top); vWin: lowest sill
+// (above the ridge); v1: the tower top. Returns the highest y used.
+function gothicCrossingTower(S, o, x0, x1, hw, v0, vWin, v1, spireH, mine) {
+  const faces = [
+    [(u, v, d) => [u, v, hw + d], { in: 'north', out: 'south', un: 'west', up: 'east' }, 'x', x0, x1],
+    [(u, v, d) => [u, v, -(hw + d)], { in: 'south', out: 'north', un: 'west', up: 'east' }, 'x', x0, x1],
+    [(u, v, d) => [x1 + d, v, u], { in: 'west', out: 'east', un: 'north', up: 'south' }, 'z', -hw, hw],
+    [(u, v, d) => [x0 - d, v, u], { in: 'east', out: 'west', un: 'north', up: 'south' }, 'z', -hw, hw],
+  ];
+  const n = x1 - x0 + 1, w = Math.max(3, Math.min(5, ((n - 5) >> 1) | 1)), AT0 = gothicArchTop(w, 0), hs = v1 - 3 - AT0;
+  for (const [W, dir, ax, a0, a1] of faces) {
+    const K = gothicKit(S, { ...o, thick: 1, backMax: -1, clear: false }, W, dir, ax, mine);
+    const us = []; for (let u = a0; u <= a1; u++) us.push(u);
+    const corner = u => u <= a0 + 1 || u >= a1 - 1;
+    for (let v = v0; v <= v1; v++) for (const u of us) K.setD(u, v, corner(u) ? 1 : 0, corner(u) ? 'frame' : 'infill');
+    const mid = (a0 + a1) >> 1, q = (a1 - a0) / 4, ucs = n >= 21 ? [Math.round(a0 + q), Math.round(a1 - q)] : [mid];   // two windows only where they leave solid corners
+    if (hs - vWin >= 3) for (const uc of ucs) K.lancet(uc, w, vWin, hs, 1, 0, v1 - 1);
+    K.fill();
+    const rows = [vWin - 1, v1]; rows.parapet = [v1];
+    K.courses(rows, us, () => false);
+    for (const f of K.ATT) f();
+  }
+  for (let x = x0 + 1; x < x1; x++) for (let z = -hw + 1; z < hw; z++) { S.set(x, v1, z, B(o.frame)); mine.add(x + ',' + v1 + ',' + z); }   // the roof of the tower
+  let top = v1 + 2;
+  if (spireH > 0) top = gothicSpire(S, { frame: o.frame, stairs: o.stairs, slab: o.slab, wall: o.wall }, (x0 + x1) >> 1, v1 + 1, 0, Math.max(2, hw - 2), spireH, 'solid', mine, null);
+  return top;
+}
