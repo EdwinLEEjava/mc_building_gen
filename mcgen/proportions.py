@@ -79,6 +79,8 @@ def _violation(m, rules):
 def solve(spec):
     """Return (adjusted_spec, report_lines, metrics)."""
     s = {**DEFAULT_SPEC, **spec}
+    if type(s["floors"]) is not int or s["floors"] < 1:
+        raise ValueError("层数必须为大于 0 的整数。")
     rules = dict(STYLE_RULES.get(s["palette"], DEFAULT_RULES))
     style = s.get("roof_style", "gable")
     if style in ROOF_STYLE_BAND:
@@ -104,7 +106,8 @@ def solve(spec):
         pitch_opts = ["normal"]
     else:
         pitch_opts = PITCHES if req_pitch == "auto" else [req_pitch] + [p for p in PITCHES if p != req_pitch]
-    floors_opts = sorted({max(1, min(3, s["floors"] + d)) for d in (0, 1, -1, 2)})
+    # Keep the requested floor count; correct the remaining proportions around it.
+    floors_opts = [s["floors"]]
     fh_opts = sorted({s["floor_height"], 4, 5})
     flare_opts = [s["flared_eave"], not s["flared_eave"]]
     jetty_opts = [s["jetty"], not s["jetty"]]
