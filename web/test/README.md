@@ -59,19 +59,3 @@ python -X utf8 web/test/make_specs.py   # 生成 292 组参数（全部示例 + 
 python -X utf8 web/test/py_run.py       # Python 版生成，结果写入 web/test/py.json
 node web/test/js_run.js         # JS 版生成并逐格比对方块和报告
 ```
-
-
-## Floor count and hint regression
-
-The parity suite includes four- and five-storey houses and asserts that requested
-floor counts are retained. The solver may still adjust floor height and roof
-proportions; upper floors retain the original cumulative overhang.
-
-With Playwright and Microsoft Edge installed, run:
-
-```powershell
-node web/test/floor-browser.cjs
-```
-
-This checks field grouping, unchanged floor-height input ranges, the hint for
-four or more floors, hover/click/keyboard dismissal, and a five-floor export.
