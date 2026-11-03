@@ -661,6 +661,7 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
         <label class="f">种子<span style="display:flex;gap:4px"><input type="number" id="d_seed" value="1" style="min-width:0"><button type="button" class="btn ghost" id="d_dice" title="随机种子" style="padding:2px 8px">🎲</button></span></label>
       </div>
       <p class="spec-note" id="d_note"></p>
+      <div class="actions"><button class="btn" type="button" id="d_run" title="把当前画好的选区按上面的设置自动生成布局">按选区自动生成布局</button></div>
       <div class="actions"><button class="btn ghost" type="button" id="t_commit" hidden>完成这条路（Enter）</button></div>
       <label class="ck"><input type="checkbox" id="t_slant" checked>房屋可以斜放以贴合斜向道路</label>
       <div class="grid">
@@ -676,7 +677,6 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
         <button class="btn ghost" type="button" id="t_clear">清空选区</button>
       </div>
       <p class="spec-note" id="t_pickinfo">按"框选区域"后在地形上点两下，定出矩形的两个对角。</p>
-      <div class="actions"><button class="btn" type="button" id="t_run">生成街区</button></div>
       <div class="status" id="t_status" role="status"></div>
     </div>
 
@@ -2571,7 +2571,7 @@ function runTown(after, live) {
     suppress = TOWN && TOWN.suppress ? TOWN.suppress.slice() : (window.PENDING_SUPPRESS || []);
     args = { keep, zones, suppress, seed: +$('t_seed').value || 1, budget: { cut: +$('t_cut').value, fill: +$('t_fill').value }, streetWidth: +$('t_width').value, square: $('t_square').checked, palette: $('t_palette').value, roads, slant: $('t_slant').checked };
   } catch (e) { tStatus('生成失败：' + e.message, true); return; }
-  if (!live) { tStatus('生成中…'); $('t_run').disabled = true; }
+  if (!live) tStatus('生成中…');
   const ver = ++TOWN_VER; TOWN_GEN_PENDING++;
   GW.call('town', 'townGen', { base: { W: base.W, H: base.H, L: base.L, palette: base.palette, data: base.data }, region, args, ver, baseTag: baseTagOf(base) }, 'coalesce').then(r => {
     if (!r || ver !== TOWN_VER) return;               // replaced by a newer request
@@ -2583,10 +2583,10 @@ function runTown(after, live) {
     TOWN.model = TER.result; refreshOverlay(); renderSel();
     if (!live && TOOL !== 'point' && TOOL !== 'brush' && TOOL !== 'drag') setTool('select');
     if (typeof after === 'function') after();
-  }).catch(e => { tStatus('生成失败：' + e.message, true); console.error(e); }).finally(() => { TOWN_GEN_PENDING--; $('t_run').disabled = false; });
+  }).catch(e => { tStatus('生成失败：' + e.message, true); console.error(e); }).finally(() => { TOWN_GEN_PENDING--; });
 }
 function runTownSync(after) {
-  tStatus('生成中…'); $('t_run').disabled = true;
+  tStatus('生成中…');
   setTimeout(() => {
     try {
       const t0 = performance.now(), { S, geo } = terrainFrom();
@@ -2620,10 +2620,18 @@ function runTownSync(after) {
       if (TOOL !== 'point' && TOOL !== 'brush') setTool('select');
       if (typeof after === 'function') after();
     } catch (e) { tStatus('生成失败：' + e.message, true); console.error(e); }
-    finally { $('t_run').disabled = false; }
   }, 30);
 }
-if (window.MCGen) $('t_run').addEventListener('click', () => runTown()); else $('town').style.display = 'none';
+function runDistrictBtn() {
+  if (SDRAW && SDRAW.click) selCloseDraw();
+  if (SELD) { $('o_zone').value = 'district'; selApply(); return; }
+  const last = picks.zones.filter(z => z.kind === 'district').pop();
+  if (last) { Object.assign(last, { style: $('d_style').value, density: $('d_dens').value, landmark: $('d_lm').value, house: $('d_house').value, seed: +$('d_seed').value || 1 }); renderZones(); runDistrict(last); return; }
+  if (curMode() !== 'layout') { const b = document.querySelector('.mode[data-mode="layout"]'); if (b) b.click(); }
+  setTool('marquee'); selHint('先在地面上画一个选区，再按"应用"或这个按钮');
+  tStatus('先用选区工具在地面上画出要生成的范围', true);
+}
+if (window.MCGen) { $('d_run').addEventListener('click', runDistrictBtn); } else $('town').style.display = 'none';
 
 // ====================== modes & component types ======================
 function setMode(m) {
