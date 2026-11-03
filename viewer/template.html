@@ -286,6 +286,12 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
   .ps { grid-template-columns: 46px 1fr; grid-template-rows: 44px 38px 60vh auto; grid-template-areas: "menu menu" "opt opt" "tools stage" "dock dock"; height: auto; }
   .brand span { display: none; }
 }
+.floor-hint{display:flex;flex-direction:column;gap:5px;margin-top:6px;padding:10px 12px;background:#fff5cf;border:1px solid #e7c76b;border-radius:8px;color:#765414;font-size:12px;line-height:1.65;font-weight:400}.floor-hint[hidden]{display:none}.floor-hint strong{color:#674509;font-size:12px}
+
+.floor-field{position:relative}.floor-info{position:relative;display:inline-flex;vertical-align:middle}.floor-info[hidden]{display:none}
+#floor-info-button{border:0;background:transparent;color:#c28b19;padding:0 5px;font-size:17px;cursor:help;line-height:1.2}
+#floor-info-button:focus-visible{outline:2px solid #c28b19;outline-offset:2px;border-radius:3px}
+.floor-info .floor-hint{position:absolute;top:100%;left:0;z-index:100;width:260px;max-width:65vw;box-sizing:border-box;margin-top:4px;box-shadow:0 5px 18px #0003;cursor:default}
 </style>
 </head>
 <body>
@@ -380,7 +386,7 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
         <label class="f">户型<select id="g_plan"></select></label>
         <label class="f">宽（x）<input type="number" id="g_width" min="5" max="41"></label>
         <label class="f">深（z）<input type="number" id="g_depth" min="5" max="41"></label>
-        <label class="f">层数<input type="number" id="g_floors" min="1" max="5"></label>
+        <label class="f floor-field" for="g_floors"><span>层数 <span class="floor-info" id="floor-info" hidden><button type="button" id="floor-info-button" aria-label="高层造型提示" aria-expanded="false" aria-controls="floor-hint">ⓘ</button><span id="floor-hint" class="floor-hint" role="tooltip" hidden><strong>⚠ 高层造型提示</strong><span>建议中世纪民房使用 1～3 层。四层及以上可能显得比例失衡。</span><span id="floor-jetty-hint">开启「上层挑出」时，高层会逐层加宽。</span></span></span></span><input type="number" id="g_floors" min="1" max="5" aria-label="层数"></label>
         <label class="f">层高<input type="number" id="g_floor_height" min="3" max="7"></label>
         <label class="f full">屋顶（形式 · 坡度）<select id="g_roof"></select></label>
         <label class="f">功能<select id="g_function"></select></label>
@@ -2251,7 +2257,13 @@ function showRamps(ramps) {
     if (r) el.innerHTML = r.map(o => `<i style="background:${o.hex}" title="${o.cn} L${o.L}"></i>`).join('');
   }
 }
+function updateFloorHint() {
+  document.getElementById("floor-info").hidden = +document.getElementById("g_floors").value <= 3;
+  if (document.getElementById("floor-info").hidden) closeFloorHint();
+  document.getElementById("floor-jetty-hint").hidden = !document.getElementById("g_jetty").checked;
+}
 function runGen() {
+  updateFloorHint();
   if (!window.MCGen) { status('生成器没有加载成功。', true); return; }
   if (GW.ok) {                                         // background thread; only the newest request is shown
     const t0 = performance.now(), spec = readForm();
@@ -3690,7 +3702,7 @@ $('og_select').addEventListener('click', e => {
   const it = selItem(); if (!it) return;
   if (a === 'w') it.spec.width = Math.max(5, Math.min(25, it.spec.width + v));
   if (a === 'd') it.spec.depth = Math.max(5, Math.min(21, it.spec.depth + v));
-  if (a === 'f') it.spec.floors = Math.max(1, Math.min(4, it.spec.floors + v));
+  if (a === 'f') it.spec.floors = Math.max(1, Math.min(5, it.spec.floors + v));
   if (a === 'lh') it.height = Math.max(2, Math.min(6, (it.height || 3) + v));
   if (a === 'ts') { const z = ['s', 'm', 'l'], i = z.indexOf(it.size || 'm'); it.size = z[Math.max(0, Math.min(2, i + v))]; }
   if (a === 'rot') it.q = ((it.q || 0) + v + 4) % 4;
@@ -3964,7 +3976,7 @@ function gizMove(e) {
       if (a) { if (g.base === undefined) g.base = axGet(a); const n = Math.round(blocks / (a.per || 1)), nv = axEnum(a) ? axStep(a, g.base, n) : axClamp(a, g.base + n); g.out = nv === g.base ? null : { gen: { [a.f]: nv } }; g.label = `${a.lab} ${axShow(a, nv)}`; }
     }
     else if (g.axis === 'y') {
-      if (v.f !== undefined) { const f = Math.max(1, Math.min(4, v.f + Math.round(blocks / v.fh))); g.out = { f }; g.label = `层数 ${f}`; }
+      if (v.f !== undefined) { const f = Math.max(1, Math.min(5, v.f + Math.round(blocks / v.fh))); g.out = { f }; g.label = `层数 ${f}`; }
       else if (selItem() && selItem().type === 'lamp') { const h = Math.max(2, Math.min(6, v.h + Math.round(blocks))); g.out = { h }; g.label = `高度 ${h}`; }
       else { const z = ['s', 'm', 'l'], i = Math.max(0, Math.min(2, z.indexOf(v.size) + Math.round(blocks / 3))); g.out = { size: z[i] }; g.label = `大小 ${({ s: '小', m: '中', l: '大' })[z[i]]}`; }
     } else {
@@ -4542,7 +4554,7 @@ function renderItemEditor() {
   const f = (lab, html, full) => `<label class="f${full ? ' full' : ''}">${lab}${html}</label>`, sel = (k, opts) => `<select data-k="${k}">${opts}</select>`, num = (k, mn, mx) => `<input type="number" data-k="${k}" min="${mn}" max="${mx}">`, ck = (k, t) => `<label class="ck"><input type="checkbox" data-k="${k}">${t}</label>`;
   let h = `<span class="sec-title">${TYPE_CN[it.type]} #${it.id}</span>`;
   if (it.type === 'house') {
-    h += `<div class="grid">${f('风格', sel('palette', optsOf('g_palette')))}${f('户型', sel('plan', optsOf('g_plan')))}${f('屋顶（形式 · 坡度）', sel('roof', optsOf('g_roof')), true)}${f('宽', num('width', 5, 25))}${f('深', num('depth', 5, 21))}${f('层数', num('floors', 1, 4))}${f('层高', num('floor_height', 3, 7))}${f('老虎窗', sel('dormers', optsOf('g_dormers')))}${f('老虎窗样式', sel('dormer_style', optsOf('g_dormer_style')))}${f('门前台阶', sel('plinth', '<option value="">由种子决定</option><option value="raise">房屋抬高一格</option><option value="flat">去掉台阶</option>'), true)}${f('种子', `<span class="seedrow"><input type="number" data-k="seed"><button class="btn ghost" type="button" data-dice="1">换一个</button></span>`, true)}</div>`;
+    h += `<div class="grid">${f('风格', sel('palette', optsOf('g_palette')))}${f('户型', sel('plan', optsOf('g_plan')))}${f('屋顶（形式 · 坡度）', sel('roof', optsOf('g_roof')), true)}${f('宽', num('width', 5, 25))}${f('深', num('depth', 5, 21))}${f('层数', num('floors', 1, 5))}${f('层高', num('floor_height', 3, 7))}${f('老虎窗', sel('dormers', optsOf('g_dormers')))}${f('老虎窗样式', sel('dormer_style', optsOf('g_dormer_style')))}${f('门前台阶', sel('plinth', '<option value="">由种子决定</option><option value="raise">房屋抬高一格</option><option value="flat">去掉台阶</option>'), true)}${f('种子', `<span class="seedrow"><input type="number" data-k="seed"><button class="btn ghost" type="button" data-dice="1">换一个</button></span>`, true)}</div>`;
     h += `<div class="grid">${ck('jetty', '上层挑出')}${ck('flared_eave', '飞檐')}${ck('chimney', '烟囱')}</div>`;
   } else if (it.type === 'lamp') {
     h += `<div class="grid">${f('样式', sel('style', optsOf('c_lamp_style')), true)}${f('高度', num('height', 2, 6))}${f('木材', sel('wood', LAMP_WOODS.map(w => `<option>${w}</option>`).join('')))}${f('石材', sel('stone', LAMP_STONES.map(w => `<option>${w}</option>`).join('')))}</div>${ck('soul', '灵魂灯笼')}`;
@@ -4587,6 +4599,29 @@ $('itemed').addEventListener('change', e => { if (e.target.dataset.k) edApply(e.
 $('itemed').addEventListener('input', e => { if (e.target.dataset.k && e.target.type === 'number') edApply(e.target); });
 $('itemed').addEventListener('click', e => { if (!e.target.dataset.dice) return; const inp = e.target.parentElement.querySelector('input'); inp.value = Math.floor(Math.random() * 99999); edApply(inp); });
 refreshTools();
+
+function closeFloorHint() {
+  document.getElementById('floor-hint').hidden = true;
+  document.getElementById('floor-info-button').setAttribute('aria-expanded', 'false');
+}
+function openFloorHint() {
+  document.getElementById('floor-hint').hidden = false;
+  document.getElementById('floor-info-button').setAttribute('aria-expanded', 'true');
+}
+const floorInfo = document.getElementById('floor-info');
+const floorInfoButton = document.getElementById('floor-info-button');
+floorInfo.addEventListener('mouseenter', openFloorHint);
+floorInfo.addEventListener('mouseleave', closeFloorHint);
+floorInfoButton.addEventListener('focus', openFloorHint);
+floorInfo.addEventListener('focusout', e => { if (!floorInfo.contains(e.relatedTarget)) closeFloorHint(); });
+floorInfoButton.addEventListener('click', e => { e.preventDefault(); openFloorHint(); });
+document.addEventListener('pointerdown', e => { if (!floorInfo.contains(e.target)) closeFloorHint(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFloorHint(); });
+for (const id of ['g_floors', 'g_jetty']) {
+  document.getElementById(id).addEventListener('input', updateFloorHint);
+  document.getElementById(id).addEventListener('change', updateFloorHint);
+}
+updateFloorHint();
 </script>
 </body>
 </html>
