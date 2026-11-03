@@ -407,10 +407,5 @@ function gothicFlyer(S, o, s, xb, z0, yp, zw, yw, RH, mine, zMid = null) {   // 
     }
     if (cols.length) levels = 2;
   }
-  if (o.gargoyles) {                             // a spout out of the top stage of the pier, under the pinnacle
-    const yg = yp - 1;
-    put(xb, yg, s * (z0 + 4), st(o.stairs, IN, 'top'));
-    put(xb, yg, s * (z0 + 5), B(o.head || o.frame));
-  }
-  return { levels, gargoyles: o.gargoyles ? 1 : 0 };
+  return { levels };
 }
