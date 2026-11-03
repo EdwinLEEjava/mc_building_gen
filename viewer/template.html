@@ -335,7 +335,8 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
       <label class="ofield" data-only="brush"><input type="checkbox" id="o_autogen" checked>松开后自动生成</label>
       <button type="button" class="obtn" data-act="undo" data-only="point">撤销一点 <kbd>Ctrl+Z</kbd></button><button type="button" class="obtn" data-act="clear">清空路线</button></div>
     <div class="og" data-for="drag"><b class="otool">拖拽道路</b><span class="ohint">拖动路线上的圆点移动它；拖动两点之间的小点插入新点；Alt+点击或右键点击删除一点。拖动时道路范围实时跟随，松开后重新生成</span></div>
-    <div class="og" data-for="green"><b class="otool">绿化</b><label class="ofield">笔刷<select id="o_gpreset"></select></label><label class="ofield">绿化颜色<select id="o_gcolor"></select></label><label class="ofield">大小<input type="number" id="o_gsize" min="1" max="64" value="8" style="width:46px"></label><label class="ofield">硬度 %<input type="number" id="o_ghard" min="0" max="100" step="10" value="50" style="width:46px"></label><label class="ofield" title="一笔最多画到多浓">不透明 %<input type="number" id="o_gop" min="5" max="100" step="5" value="100" style="width:46px"></label><label class="ofield" title="每落一笔加多少；低流量要来回涂几遍才浓">流量 %<input type="number" id="o_gflow" min="1" max="100" step="5" value="100" style="width:46px"></label><button type="button" class="obtn" id="o_gmore" title="间距、散布、数量、抖动、喷溅团块……">笔刷设置 ▾</button><label class="ofield" data-gonly="erase thin">擦<select id="o_gerase"><option value="all" selected>所有图层</option><option value="one">当前图层</option></select></label><button type="button" class="obtn" id="o_gfill" title="用当前绿化颜色填满选区工具（M）画好的选区">填满选区</button><span class="ohint" id="o_ghint">按住左键在地面上画；[ ] 改大小</span></div>
+    <div class="og" data-for="erase"><b class="otool">地表橡皮擦</b><span class="oseg" id="o_emode"><button type="button" data-em="erase" aria-pressed="true" title="擦掉用绿化笔刷画上去的绿化">擦绿化</button><button type="button" data-em="clear" title="清除涂过的地方地形原有的树、草、花、雪">清除地表</button><button type="button" data-em="unclear" title="把清除过地表的地方恢复原样">恢复地表</button></span><label class="ofield" id="o_escope">擦<select id="o_gerase"><option value="all" selected>所有绿化图层</option><option value="one">当前绿化图层</option></select></label><label class="ofield">大小<input type="number" id="o_esize" min="1" max="64" value="8" style="width:46px"></label><button type="button" class="obtn" id="o_efill" title="对选区工具（M）画好的选区整片清除 / 恢复">作用于选区</button><span class="ohint" id="o_ehint"></span></div>
+    <div class="og" data-for="green"><b class="otool">绿化</b><label class="ofield">笔刷<select id="o_gpreset"></select></label><label class="ofield">绿化颜色<select id="o_gcolor"></select></label><label class="ofield">大小<input type="number" id="o_gsize" min="1" max="64" value="8" style="width:46px"></label><label class="ofield">硬度 %<input type="number" id="o_ghard" min="0" max="100" step="10" value="50" style="width:46px"></label><label class="ofield" title="一笔最多画到多浓">不透明 %<input type="number" id="o_gop" min="5" max="100" step="5" value="100" style="width:46px"></label><label class="ofield" title="每落一笔加多少；低流量要来回涂几遍才浓">流量 %<input type="number" id="o_gflow" min="1" max="100" step="5" value="100" style="width:46px"></label><button type="button" class="obtn" id="o_gmore" title="间距、散布、数量、抖动、喷溅团块……">笔刷设置 ▾</button><button type="button" class="obtn" id="o_gfill" title="用当前绿化颜色填满选区工具（M）画好的选区">填满选区</button><span class="ohint" id="o_ghint">按住左键在地面上画；[ ] 改大小</span></div>
     <div class="gpop" id="gpop" hidden>
       <div class="gpgrid">
         <label>间距 %<input type="number" id="gp_spacing" min="5" max="1000" step="5" title="两次落笔的距离，按笔刷直径的百分比"></label>
@@ -359,7 +360,7 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
   <nav class="toolbar" id="toolbar" aria-label="工具">
     <button type="button" class="tool" data-tool="select" title="选择 / 移动（V）" aria-label="选择 / 移动"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l13 8-6 1.5L9 19z"/></svg><kbd>V</kbd></button><button type="button" class="tool" data-tool="view" title="旋转视角（R）" aria-label="旋转视角"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8" /><path d="M20 4v5h-5" /></svg><kbd>R</kbd></button><button type="button" class="tool" data-tool="pan" title="平移（H）" aria-label="平移"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18" /><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" /></svg><kbd>H</kbd></button>
     <i class="tsep"></i>
-    <button type="button" class="tool" data-tool="point" title="画路（P 点选 / B 连续）" aria-label="画路"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18c3 0 4-2 5-4s3-6 6-7 5 1 5 1" /><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="8" r="1.6"/></svg><kbd>P</kbd></button><button type="button" class="tool" data-tool="drag" title="拖拽道路（D）" aria-label="拖拽道路"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17c4 0 5-6 9-6s4 4 7 4" /><circle cx="13" cy="11" r="2.6"/><path d="M13 4v3M13 15v3M6 11h3M17 11h3" /></svg><kbd>D</kbd></button><button type="button" class="tool" data-tool="marquee" title="选框（M）" aria-label="选框"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1" stroke-dasharray="3 2.5"/></svg><kbd>M</kbd></button><button type="button" class="tool" data-tool="green" title="绿化笔刷（J）" aria-label="绿化笔刷"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z"/><path d="M5 19l7-7"/></svg><kbd>J</kbd></button>
+    <button type="button" class="tool" data-tool="point" title="画路（P 点选 / B 连续）" aria-label="画路"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18c3 0 4-2 5-4s3-6 6-7 5 1 5 1" /><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="8" r="1.6"/></svg><kbd>P</kbd></button><button type="button" class="tool" data-tool="drag" title="拖拽道路（D）" aria-label="拖拽道路"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17c4 0 5-6 9-6s4 4 7 4" /><circle cx="13" cy="11" r="2.6"/><path d="M13 4v3M13 15v3M6 11h3M17 11h3" /></svg><kbd>D</kbd></button><button type="button" class="tool" data-tool="marquee" title="选框（M）" aria-label="选框"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1" stroke-dasharray="3 2.5"/></svg><kbd>M</kbd></button><button type="button" class="tool" data-tool="green" title="绿化笔刷（J）" aria-label="绿化笔刷"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z"/><path d="M5 19l7-7"/></svg><kbd>J</kbd></button><button type="button" class="tool" data-tool="erase" title="地表橡皮擦：清除地形上原有的树、草、花（E）" aria-label="地表橡皮擦"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4l6 6-9 9H6l-3-3z"/><path d="M9 9l6 6"/><path d="M11 19h9"/></svg><kbd>E</kbd></button>
   </nav>
   <aside id="src" hidden>
     <div>
@@ -2046,7 +2047,7 @@ canvas.addEventListener('pointerdown', e => {
   if (TOOL === 'select' && e.button === 0 && !e.shiftKey && !e.altKey && !ptrs.size && ((!(e.ctrlKey || e.metaKey) && gizDown(e)) || selDown(e))) return;
   if (TOOL === 'select' && e.button === 0 && !e.shiftKey && !e.altKey && !ptrs.size && townActive()) { bsel = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, add: e.ctrlKey || e.metaKey }; return; }
   if (TOOL === 'marquee' && curMode() === 'layout' && e.button === 0 && !e.shiftKey && !ptrs.size && marqDown(e)) return;
-  if (TOOL === 'green' && curMode() === 'layout' && e.button === 0 && !e.shiftKey && !ptrs.size && greenDown(e)) return;
+  if ((TOOL === 'green' || TOOL === 'erase') && curMode() === 'layout' && e.button === 0 && !e.shiftKey && !ptrs.size && greenDown(e)) return;
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, pan: e.button === 2 || e.shiftKey || TOOL === 'pan' }); });
 canvas.addEventListener('pointerup', e => {
   if (rdrag && rdrag.id === e.pointerId) { rdragUp(); return; }
@@ -2064,7 +2065,7 @@ canvas.addEventListener('pointermove', e => {
   if (ARMED && !ptrs.size) { ghostAt(e); }
   if (rdrag && rdrag.id === e.pointerId) { rdragMove(e); return; }
   if (stroke && stroke.id === e.pointerId) { strokeAdd(e); return; }
-  if (TOOL === 'green' && curMode() === 'layout' && !ptrs.size) { greenMove(e); if (GSTROKE && GSTROKE.id === e.pointerId) return; }
+  if ((TOOL === 'green' || TOOL === 'erase') && curMode() === 'layout' && !ptrs.size) { greenMove(e); if (GSTROKE && GSTROKE.id === e.pointerId) return; }
   if (TOOL === 'marquee' && SDRAW && (SDRAW.id === e.pointerId || SDRAW.click)) { selMoveDraw(e); if (SDRAW && SDRAW.id === e.pointerId) return; }
   if (bsel && bsel.id === e.pointerId) { bsel.x = e.clientX; bsel.y = e.clientY; redraw(); return; }
   if (gdrag && gdrag.id === e.pointerId) { gizMove(e); return; }
@@ -3455,9 +3456,10 @@ if (initGL()) { if (SAMPLES.length) samplesEl.querySelector('.chip').click(); re
 
 // ---- tools (left strip) + options bar
 var TOOL = 'select', mq = null;
-const TOOL_MODES = { select: ['comp', 'layout'], view: ['comp', 'site', 'layout'], pan: ['comp', 'site', 'layout'], point: ['site', 'layout'], brush: ['site', 'layout'], drag: ['site', 'layout'], marquee: ['layout'], green: ['layout'] };
+const TOOL_MODES = { select: ['comp', 'layout'], view: ['comp', 'site', 'layout'], pan: ['comp', 'site', 'layout'], point: ['site', 'layout'], brush: ['site', 'layout'], drag: ['site', 'layout'], marquee: ['layout'], green: ['layout'], erase: ['layout'] };
 function setTool(t) {
   if (!TOOL_MODES[t].includes(curMode())) return;
+  eraserSwap(t);
   TOOL = t;
   document.querySelectorAll('.tool').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t || (b.dataset.tool === 'point' && t === 'brush'))));
   document.querySelectorAll('.og').forEach(g => g.classList.toggle('on', g.dataset.for.split(' ').includes(t)));
@@ -3725,8 +3727,8 @@ addEventListener('keydown', e => {
   if (TOOL === 'marquee' && curMode() === 'layout' && selKey2(e)) { e.preventDefault(); return; }
   if (ARMED) { const k = e.key.toLowerCase(); if (k === 'escape') { disarm(); return; } if (k === 'q' || k === 'e') { ARMED.q = ((ARMED.q || 0) + (k === 'e' ? 1 : 3)) % 4; RECO = null; redraw(); return; } }
   if (TOOL === 'select' && SEL) { const gm = { s: 'scale', e: 'rotate', g: 'move' }[e.key.toLowerCase()]; if (gm) { GMODE = gm; renderSel(); redraw(); return; } }
-  if (TOOL === 'green' && (e.key === '[' || e.key === ']' || e.key === '{' || e.key === '}')) { greenKey(e.key); e.preventDefault(); return; }
-  const t = { v: 'select', r: 'view', h: 'pan', p: 'point', b: 'brush', d: 'drag', m: 'marquee', j: 'green' }[e.key.toLowerCase()];
+  if ((TOOL === 'green' || TOOL === 'erase') && (e.key === '[' || e.key === ']' || e.key === '{' || e.key === '}')) { greenKey(e.key); e.preventDefault(); return; }
+  const t = { v: 'select', r: 'view', h: 'pan', p: 'point', b: 'brush', d: 'drag', m: 'marquee', j: 'green', e: 'erase' }[e.key.toLowerCase()];
   if (t) setTool(t);
 });
 // ---- selection: pick a house / prop, move it by dragging, edit it from the options bar
@@ -4116,7 +4118,7 @@ function drawGizmo() {
   gctx.setTransform(dpr, 0, 0, dpr, 0, 0); gctx.clearRect(0, 0, r.width, r.height);
   if (ARMED) drawReco();
   if (TOOL === 'marquee') drawSelLive();
-  if (TOOL === 'green') drawGreenCursor();
+  if (TOOL === 'green' || TOOL === 'erase') drawGreenCursor();
   if (GHOST) drawGhost();
   if (FLASH) drawFlash();
   if (bsel && Math.hypot(bsel.x - bsel.sx, bsel.y - bsel.sy) > 4) { const r = canvas.getBoundingClientRect(), x = Math.min(bsel.sx, bsel.x) - r.left, y = Math.min(bsel.sy, bsel.y) - r.top; gctx.fillStyle = 'rgba(74,208,232,.12)'; gctx.fillRect(x, y, Math.abs(bsel.x - bsel.sx), Math.abs(bsel.y - bsel.sy)); gctx.strokeStyle = '#4ad0e8'; gctx.lineWidth = 1; gctx.setLineDash([5, 3]); gctx.strokeRect(x + .5, y + .5, Math.abs(bsel.x - bsel.sx), Math.abs(bsel.y - bsel.sy)); gctx.setLineDash([]); }
@@ -4812,7 +4814,6 @@ const GB_PRESETS = {
   dots: { name: '散点', mode: 'paint', size: 3, hard: 100, spacing: 250, scatter: 400, both: true, count: 2, countJ: 100, sizeJ: 30 },
   stamp: { name: '印章（点一下放一组）', mode: 'paint', size: 9, hard: 70, spacing: 1000 },
   line: { name: '沿线（配“行道树”颜色种一排树）', mode: 'line', size: 1, hard: 100, gap: 7, offset: 0 },
-  erase: { name: '橡皮擦', mode: 'erase', hard: 60 },
   thin: { name: '稀疏化', mode: 'thin', hard: 30, op: 40 },
   blur: { name: '模糊（让边缘过渡更软）', mode: 'blur', hard: 30 },
   gradient: { name: '渐变（拖一条线，填满选区）', mode: 'gradient', op: 100 },
@@ -4821,19 +4822,48 @@ const GB_UKEY = 'mcgen.green.brushes';
 let GB_USER = []; try { GB_USER = JSON.parse(localStorage.getItem(GB_UKEY) || '[]').filter(b => b && b.id && b.name); } catch (e) { GB_USER = []; }
 const GB = { ...GB_BASE, ...GB_PRESETS.soft, preset: 'soft' };
 try { const s = JSON.parse(localStorage.getItem(GB_KEY) || '{}'); for (const k of Object.keys(GB_BASE)) if (s[k] !== undefined) GB[k] = s[k]; if (s.preset) GB.preset = s.preset; } catch (e) { }
-const gbSave = () => { try { localStorage.setItem(GB_KEY, JSON.stringify(GB)); } catch (e) { } };
+const gbSave = () => { if (GB_STASH) { ERASER.size = GB.size; eraserBar(); return; } try { localStorage.setItem(GB_KEY, JSON.stringify(GB)); } catch (e) { } };
 function gbLoad(key) {
   const u = key.startsWith('u:') ? GB_USER.find(b => 'u:' + b.id === key) : null, p = u ? u.brush : GB_PRESETS[key];
   if (!p) return; const keep = { size: GB.size, erase: GB.erase };
   Object.assign(GB, GB_BASE, p, { preset: key });
   if (!('size' in p)) GB.size = keep.size; GB.erase = keep.erase; delete GB.name; gbSave();
 }
+// 地表橡皮擦 (tool E) borrows the greenery stroke code: while it is the tool, GB holds the eraser's settings
+var GB_STASH = null; const ERASER = { mode: 'erase', size: 8, erase: 'all' };
+function eraserSwap(t) {
+  if (t === 'erase' && !GB_STASH) { GB_STASH = { ...GB }; Object.assign(GB, GB_BASE, { mode: ERASER.mode, size: ERASER.size, hard: ERASER.mode === 'erase' ? 60 : 100, erase: ERASER.erase, preset: '' }); eraserBar(); }
+  else if (t !== 'erase' && GB_STASH) { ERASER.size = GB.size; Object.assign(GB, GB_STASH); GB_STASH = null; greenBar(); }
+}
+function eraserBar() {
+  if (!$('o_esize')) return; $('o_esize').value = ERASER.size;
+  document.querySelectorAll('#o_emode button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.em === ERASER.mode)));
+  $('o_escope').hidden = ERASER.mode !== 'erase'; $('o_gerase').value = ERASER.erase;
+  $('o_ehint').textContent = { erase: '按住左键擦掉绿化笔刷画上去的绿化；[ ] 改大小', clear: '按住左键清除地形原有的树、草、花；房屋、道路、水不受影响', unclear: '按住左键把清除过的地表恢复原样' }[ERASER.mode];
+}
+document.querySelectorAll('#o_emode button').forEach(b => b.addEventListener('click', () => { ERASER.mode = b.dataset.em; if (GB_STASH) { GB.mode = ERASER.mode; GB.hard = ERASER.mode === 'erase' ? 60 : 100; } eraserBar(); redraw(); }));
+$('o_esize').addEventListener('change', e => { ERASER.size = Math.max(1, Math.min(64, Math.round(+e.target.value) || 8)); if (GB_STASH) GB.size = ERASER.size; eraserBar(); redraw(); });
+$('o_efill').addEventListener('click', () => {
+  if (!SELD || !SELD.mask || !SELD.mask.count) { $('o_ehint').textContent = '先用选区工具（M）在地面上画一个选区，再回来按“作用于选区”。'; return; }
+  if (!ensureTown()) return;
+  const M = SELD.mask, cells = new Map();
+  for (let x = M.x0; x <= M.x1; x++) for (let z = M.z0; z <= M.z1; z++) if (M.has(x, z)) cells.set(x + ',' + z, 1);
+  greenApply(cells, ERASER.mode === 'erase' ? '清掉了选区里的绿化' : ERASER.mode === 'clear' ? `清除了选区里地表原有的树、草、花（${cells.size} 格）` : '恢复了选区里地表原有的树、草、花', ERASER.mode);
+});
+if (GB.mode === 'erase' && !String(GB.preset).startsWith('u:')) gbLoad('soft');   // the eraser moved to its own tool (E)
+eraserBar();
 const greenState = () => picks.green || (picks.green = { layers: [], active: null, nextId: 1 });
 const greenLayersAll = () => [...(TOWN && TOWN.AUTO || []), ...greenArgs().layers];
 const greenOn = () => !!(picks.green && picks.green.layers.length) || !!(TOWN && TOWN.AUTO && TOWN.AUTO.length) || !!(TOWN && TOWN.OV && TOWN.OV.size);
-function greenArgs() { const G = picks.green; return { layers: G ? G.layers.map(l => ({ id: l.id, recipe: l.recipe, seed: l.seed, visible: l.visible, tiles: l.tiles })) : [] }; }
+function greenArgs() { const G = picks.green; return { layers: G ? G.layers.map(l => ({ id: l.id, recipe: l.recipe, seed: l.seed, visible: l.visible, tiles: l.tiles, clear: l.clear || undefined })) : [] }; }
 function greenSwatchName(v) { if (v && v.startsWith('u:')) { const s = GREEN_USER.find(x => 'u:' + x.id === v); return s ? s.name : '（已删除的绿化颜色）'; } return (MCGen.GREEN_SWATCHES[v] || {}).name || v; }
-function greenActive() { const G = greenState(); return G.layers.find(l => l.id === G.active) || null; }
+function greenActive() { const G = greenState(); return G.layers.find(l => l.id === G.active && !l.clear) || null; }
+const greenPaintLayers = G => G.layers.filter(l => !l.clear);
+function greenClearLayer(G, make) {
+  let L = G.layers.find(l => l.clear);
+  if (!L && make) { L = { id: G.nextId++, name: '清除地表', clear: true, swatch: '', recipe: null, seed: 1, visible: true, tiles: {} }; G.layers.unshift(L); }
+  return L;
+}
 function greenLayerFor(sw) {
   const G = greenState(); let L = G.layers.slice().reverse().find(l => l.swatch === sw);
   if (!L) { L = { id: G.nextId, name: greenSwatchName(sw), swatch: sw, recipe: MCGen.greenRecipe(greenSwatch(sw) || {}), seed: 1 + G.nextId * 7, visible: true, tiles: {} }; G.nextId++; G.layers.push(L); }
@@ -4846,7 +4876,7 @@ function greenBar() {
   const sel = $('o_gpreset');
   sel.innerHTML = `<optgroup label="内置">${Object.entries(GB_PRESETS).map(([k, p]) => `<option value="${k}">${p.name}</option>`).join('')}</optgroup>` + (GB_USER.length ? `<optgroup label="我保存的">${GB_USER.map(b => `<option value="u:${b.id}">${b.name.replace(/</g, '&lt;')}</option>`).join('')}</optgroup>` : '');
   sel.value = [...sel.options].some(o => o.value === GB.preset) ? GB.preset : 'soft';
-  $('o_gsize').value = GB.size; $('o_ghard').value = GB.hard; $('o_gop').value = GB.op; $('o_gflow').value = GB.flow; $('o_gerase').value = GB.erase;
+  $('o_gsize').value = GB.size; $('o_ghard').value = GB.hard; $('o_gop').value = GB.op; $('o_gflow').value = GB.flow;
   document.querySelectorAll('[data-gonly]').forEach(el => { el.hidden = !el.dataset.gonly.split(' ').includes(GB.mode); });
   $('o_gcolor').closest('label').hidden = !['paint', 'line', 'gradient'].includes(GB.mode);
   for (const k of ['spacing', 'sizeJ', 'scatter', 'count', 'countJ', 'rough', 'gap', 'offset']) $('gp_' + k).value = GB[k];
@@ -4879,7 +4909,7 @@ $('gp_del').addEventListener('click', () => {
   GB_USER = GB_USER.filter(b => 'u:' + b.id !== GB.preset); try { localStorage.setItem(GB_UKEY, JSON.stringify(GB_USER)); } catch (e) { }
   gbLoad('soft'); greenBar(); $('gp_hint').textContent = '已删除。';
 });
-$('o_gerase').addEventListener('change', e => { GB.erase = e.target.value; gbSave(); });
+$('o_gerase').addEventListener('change', e => { ERASER.erase = e.target.value; if (GB_STASH) GB.erase = ERASER.erase; });
 $('o_gcolor').addEventListener('change', e => { const G = greenState(), L = G.layers.slice().reverse().find(l => l.swatch === e.target.value); if (L) G.active = L.id; greenPanel(); });
 function greenKey(k) { const big = k === '{' || k === '}', up = k === ']' || k === '}';
   if (big) GB.hard = Math.max(0, Math.min(100, GB.hard + (up ? 10 : -10))); else GB.size = Math.max(1, Math.min(64, GB.size + (up ? (GB.size >= 10 ? 2 : 1) : -(GB.size > 10 ? 2 : 1))));
@@ -4888,6 +4918,7 @@ $('o_gfill').addEventListener('click', () => {
   if (!SELD || !SELD.mask || !SELD.mask.count) { $('o_ghint').textContent = '先用选区工具（M）在地面上画一个选区，再回来按“填满选区”。'; return; }
   const M = SELD.mask, cells = new Map();
   for (let x = M.x0; x <= M.x1; x++) for (let z = M.z0; z <= M.z1; z++) if (M.has(x, z)) cells.set(x + ',' + z, 1);
+  if (GB.mode === 'clear' || GB.mode === 'unclear') { greenApply(cells, GB.mode === 'clear' ? `清除了选区里地表原有的树、草、花（${cells.size} 格）` : `恢复了选区里地表原有的树、草、花`, GB.mode); return; }
   greenApply(cells, GB.mode === 'erase' || GB.mode === 'thin' ? '清掉了选区里的绿化' : `用“${greenSwatchName($('o_gcolor').value)}”填满了选区（${cells.size} 格）`, GB.mode === 'erase' || GB.mode === 'thin' ? 'erase' : 'paint');
 });
 // ---- stroke ----
@@ -4955,7 +4986,7 @@ function greenUp() {
   if (!st) { redraw(); return; }
   if (GB.mode === 'gradient') { greenGradient(st.start, st.last); return; }
   if (!st.cells.size) { redraw(); return; }
-  const what = { erase: `橡皮擦：${st.cells.size} 格`, thin: `稀疏化：${st.cells.size} 格`, blur: `模糊：${st.cells.size} 格` }[GB.mode] || `画了“${greenSwatchName($('o_gcolor').value)}”：${st.cells.size} 格`;
+  const what = { clear: `清除地表杂物：${st.cells.size} 格`, unclear: `恢复地表杂物：${st.cells.size} 格`, erase: `橡皮擦：${st.cells.size} 格`, thin: `稀疏化：${st.cells.size} 格`, blur: `模糊：${st.cells.size} 格` }[GB.mode] || `画了“${greenSwatchName($('o_gcolor').value)}”：${st.cells.size} 格`;
   greenApply(st.cells, what, GB.mode === 'line' ? 'paint' : GB.mode);
 }
 // 渐变: density from 0 at the start to the opacity at the end, over the pending selection
@@ -4971,10 +5002,25 @@ function greenGradient(a, b) {
 // the one under it); erase: the target layers go down
 function greenApply(cells, what, mode = 'paint') {
   const G = greenState(), op = GB.op / 100, erase = mode === 'erase' || mode === 'thin';
-  if ((erase || mode === 'blur') && !G.layers.length) { $('o_ghint').textContent = '这里还没有绿化。'; return; }
+  if (mode === 'clear' || mode === 'unclear') {        // 清除地表: a yes / no mask, kept as a special layer under the others
+    const C = greenClearLayer(G, mode === 'clear'); if (!C) { $('o_ehint').textContent = '这里没有清除过地表。'; return; }
+    greenPushHist(); let box = null;
+    for (const [k, s] of cells) {
+      const [x, z] = k.split(',').map(Number); if (x < 0 || z < 0 || (model && (x >= model.W || z >= model.L)) || s < 0.3) continue;
+      const tk = (x >> 4) + ',' + (z >> 4), i = (x & 15) + ((z & 15) << 4); let t = C.tiles[tk];
+      if (mode === 'clear') { if (!t) t = C.tiles[tk] = new Uint8Array(256); if (t[i] === 255) continue; t[i] = 255; }
+      else { if (!t || !t[i]) continue; t[i] = 0; }
+      box = boxU(box, [x, z, x, z]);
+    }
+    for (const [k, t] of Object.entries(C.tiles)) if (!t.some(v => v)) delete C.tiles[k];
+    if (!Object.keys(C.tiles).length) G.layers.splice(G.layers.indexOf(C), 1);
+    greenPanel(); if (box) greenSend(box, what); else $('o_ehint').textContent = mode === 'clear' ? '这里已经清除过了。' : '这里没有清除过地表。';
+    return;
+  }
+  if ((erase || mode === 'blur') && !greenPaintLayers(G).length) { $('o_ghint').textContent = '这里还没有绿化。'; return; }
   greenPushHist();
   const L = erase || mode === 'blur' ? null : (greenActive() && greenActive().swatch === $('o_gcolor').value ? greenActive() : greenLayerFor($('o_gcolor').value));
-  const targets = erase ? (GB.erase === 'one' && greenActive() ? [greenActive()] : G.layers) : G.layers;
+  const targets = erase ? (GB.erase === 'one' && greenActive() ? [greenActive()] : greenPaintLayers(G)) : greenPaintLayers(G);
   let box = null;
   const get = (T, x, z) => { const t = T.tiles[(x >> 4) + ',' + (z >> 4)]; return t ? t[(x & 15) + ((z & 15) << 4)] : 0; };
   const blurred = mode === 'blur' ? new Map() : null;
@@ -4990,7 +5036,7 @@ function greenApply(cells, what, mode = 'paint') {
     });
     box = boxU(box, [x, z, x, z]);
   }
-  for (const T of G.layers) for (const [k, t] of Object.entries(T.tiles)) if (!t.some(v => v)) delete T.tiles[k];
+  for (const T of greenPaintLayers(G)) for (const [k, t] of Object.entries(T.tiles)) if (!t.some(v => v)) delete T.tiles[k];
   greenPanel(); if (box) greenSend(box, what);
 }
 function greenSend(rect, what, tries = 0) {
@@ -5042,6 +5088,7 @@ function greenPanel() {
   const G = greenState(), sws = `<optgroup label="内置">${Object.entries(MCGen.GREEN_SWATCHES).map(([k, s]) => `<option value="${k}">${s.name}</option>`).join('')}</optgroup>` + (GREEN_USER.length ? `<optgroup label="我保存的">${GREEN_USER.map(s => `<option value="u:${s.id}">${s.name.replace(/</g, '&lt;')}</option>`).join('')}</optgroup>` : '');
   $('g_layers').innerHTML = G.layers.length ? G.layers.slice().reverse().map(L => {
     let n = 0; for (const t of Object.values(L.tiles)) for (const v of t) if (v) n++;
+    if (L.clear) return `<div class="glayer" data-gl="${L.id}"><input type="checkbox" data-gf="visible" ${L.visible !== false ? 'checked' : ''} title="关掉就恢复显示原有的树、草、花"><b style="flex:1">清除地表（原有的树、草、花）</b><span>${n} 格</span><div class="gl2"><button type="button" data-ga="del" title="全部恢复">全部恢复</button></div></div>`;
     return `<div class="glayer${L.id === G.active ? ' on' : ''}" data-gl="${L.id}"><input type="checkbox" data-gf="visible" ${L.visible !== false ? 'checked' : ''} title="显示 / 隐藏"><input type="text" data-gf="name" value="${String(L.name).replace(/"/g, '&quot;')}" aria-label="图层名"><span>${n} 格</span>`
       + `<div class="gl2"><select data-gf="swatch" title="这个图层用的绿化颜色（配方）">${sws.replace(`value="${L.swatch}"`, `value="${L.swatch}" selected`)}</select><input type="number" data-gf="seed" value="${L.seed}" title="种子：只换植物的位置，不改范围"><button type="button" data-ga="dice" title="换一个种子">🎲</button><button type="button" data-ga="up" title="上移">↑</button><button type="button" data-ga="down" title="下移">↓</button><button type="button" data-ga="del" title="删除这个图层">删除</button></div></div>`;
   }).join('') : '<div class="spec-note">还没有绿化。选左边的绿化笔刷（J），在地面上画。</div>';
@@ -5049,17 +5096,17 @@ function greenPanel() {
 $('g_layers').addEventListener('click', e => {
   const row = e.target.closest('.glayer'); if (!row) return; const G = greenState(), L = G.layers.find(l => l.id === +row.dataset.gl); if (!L) return;
   const a = e.target.dataset.ga;
-  if (!a) { if (G.active !== L.id && !e.target.matches('input, select')) { G.active = L.id; $('o_gcolor').value = L.swatch; greenPanel(); } return; }
+  if (!a) { if (L.clear) return; if (G.active !== L.id && !e.target.matches('input, select')) { G.active = L.id; $('o_gcolor').value = L.swatch; greenPanel(); } return; }
   greenPushHist(); const before = greenClone(G), i = G.layers.indexOf(L);
   if (a === 'dice') L.seed = 1 + Math.floor(Math.random() * 99999);
   else if (a === 'up' && i < G.layers.length - 1) [G.layers[i], G.layers[i + 1]] = [G.layers[i + 1], G.layers[i]];
   else if (a === 'down' && i > 0) [G.layers[i], G.layers[i - 1]] = [G.layers[i - 1], G.layers[i]];
   else if (a === 'del') { G.layers.splice(i, 1); if (G.active === L.id) G.active = G.layers.length ? G.layers[G.layers.length - 1].id : null; }
-  greenLayerChanged(before, { dice: '换了绿化种子', up: '图层上移', down: '图层下移', del: `删除了绿化图层“${L.name}”` }[a]);
+  greenLayerChanged(before, { dice: '换了绿化种子', up: '图层上移', down: '图层下移', del: L.clear ? '地表原有的树、草、花全部恢复了' : `删除了绿化图层“${L.name}”` }[a]);
 });
 $('g_layers').addEventListener('change', e => {
   const row = e.target.closest('.glayer'); if (!row) return; const G = greenState(), L = G.layers.find(l => l.id === +row.dataset.gl); if (!L) return;
-  const f = e.target.dataset.gf; if (f === 'name') { L.name = e.target.value.slice(0, 24) || L.name; return; }
+  const f = e.target.dataset.gf; if (L.clear && f !== 'visible') return; if (f === 'name') { L.name = e.target.value.slice(0, 24) || L.name; return; }
   greenPushHist(); const before = greenClone(G);
   if (f === 'visible') L.visible = e.target.checked;
   else if (f === 'seed') L.seed = Math.max(1, Math.round(+e.target.value) || 1);
@@ -5086,21 +5133,21 @@ function drawGreenCursor() {
     for (const [k, s] of GSTROKE.cells) { if (++n > 6000) break; const [x, z] = k.split(',').map(Number); if (x < 0 || z < 0 || x >= model.W || z >= model.L) continue;
       const P = quad(x, z, topY(x, z) + 1.02); if (P.some(p => !p)) continue;
       gctx.beginPath(); P.forEach((p, i) => i ? gctx.lineTo(p[0], p[1]) : gctx.moveTo(p[0], p[1])); gctx.closePath();
-      gctx.fillStyle = GB.mode === 'erase' || GB.mode === 'thin' ? `rgba(230,90,70,${0.15 + 0.4 * s})` : GB.mode === 'blur' ? `rgba(120,170,230,${0.15 + 0.4 * s})` : `rgba(120,210,90,${0.15 + 0.45 * s})`; gctx.fill(); }
+      gctx.fillStyle = GB.mode === 'clear' ? `rgba(240,190,60,${0.2 + 0.4 * s})` : GB.mode === 'unclear' ? `rgba(120,170,230,${0.2 + 0.4 * s})` : GB.mode === 'erase' || GB.mode === 'thin' ? `rgba(230,90,70,${0.15 + 0.4 * s})` : GB.mode === 'blur' ? `rgba(120,170,230,${0.15 + 0.4 * s})` : `rgba(120,210,90,${0.15 + 0.45 * s})`; gctx.fill(); }
   }
   if (!GCUR) return;
   const [cx, cz, cy] = GCUR, r = Math.max(0.5, GB.size / 2), ring = (rr, dash) => { const P = []; for (let i = 0; i <= 48; i++) { const a = i / 48 * Math.PI * 2, p = proj([cx + 0.5 + Math.cos(a) * rr, cy + 1.05, cz + 0.5 + Math.sin(a) * rr]); if (p) P.push(p); }
     gctx.beginPath(); P.forEach((p, i) => i ? gctx.lineTo(p[0], p[1]) : gctx.moveTo(p[0], p[1])); gctx.setLineDash(dash); gctx.stroke(); gctx.setLineDash([]); };
   if (GB.mode === 'gradient') { gctx.fillStyle = '#9be07a'; const p = proj([cx + .5, cy + 1.05, cz + .5]); if (p) { gctx.beginPath(); gctx.arc(p[0], p[1], 4, 0, 7); gctx.fill(); } return; }
-  gctx.lineWidth = 2; gctx.strokeStyle = GB.mode === 'erase' || GB.mode === 'thin' ? '#ff8a6a' : GB.mode === 'blur' ? '#8ab8ff' : '#9be07a'; ring(r, []);
+  gctx.lineWidth = 2; gctx.strokeStyle = GB.mode === 'clear' ? '#f0c040' : GB.mode === 'unclear' ? '#8ab8ff' : GB.mode === 'erase' || GB.mode === 'thin' ? '#ff8a6a' : GB.mode === 'blur' ? '#8ab8ff' : '#9be07a'; ring(r, []);
   if (GB.mode === 'line' && GB.offset) { gctx.lineWidth = 1; gctx.strokeStyle = 'rgba(255,255,255,.6)'; ring(GB.offset, [4, 3]); }
   if (GB.tip !== 'splat' && GB.hard < 100 && r > 1) { gctx.lineWidth = 1; gctx.strokeStyle = 'rgba(255,255,255,.6)'; ring(r * GB.hard / 100, [4, 3]); }
 }
 // ---- save / open ----
-function greenSave() { const G = picks.green; if (!G || !G.layers.length) return null; return { v: 1, active: G.active, nextId: G.nextId, layers: G.layers.map(l => ({ id: l.id, name: l.name, swatch: l.swatch, recipe: l.recipe, seed: l.seed, visible: l.visible !== false, tiles: Object.fromEntries(Object.entries(l.tiles).map(([k, t]) => [k, b64e(t)])) })) }; }
+function greenSave() { const G = picks.green; if (!G || !G.layers.length) return null; return { v: 1, active: G.active, nextId: G.nextId, layers: G.layers.map(l => ({ id: l.id, name: l.name, swatch: l.swatch, recipe: l.recipe, seed: l.seed, visible: l.visible !== false, clear: l.clear || undefined, tiles: Object.fromEntries(Object.entries(l.tiles).map(([k, t]) => [k, b64e(t)])) })) }; }
 function greenLoadProject(g) {
   picks.green = null;
-  if (g && Array.isArray(g.layers)) picks.green = { active: g.active, nextId: g.nextId || g.layers.length + 1, layers: g.layers.map(l => ({ id: l.id, name: l.name || greenSwatchName(l.swatch), swatch: l.swatch, recipe: MCGen.greenRecipe(l.recipe), seed: l.seed || 1, visible: l.visible !== false, tiles: Object.fromEntries(Object.entries(l.tiles || {}).map(([k, t]) => [k, b64d(t)]).filter(([, t]) => t.length === 256)) })) };
+  if (g && Array.isArray(g.layers)) picks.green = { active: g.active, nextId: g.nextId || g.layers.length + 1, layers: g.layers.map(l => ({ id: l.id, name: l.name || greenSwatchName(l.swatch), swatch: l.swatch, recipe: l.clear ? null : MCGen.greenRecipe(l.recipe), clear: !!l.clear || undefined, seed: l.seed || 1, visible: l.visible !== false, tiles: Object.fromEntries(Object.entries(l.tiles || {}).map(([k, t]) => [k, b64d(t)]).filter(([, t]) => t.length === 256)) })) };
   greenPanel();
 }
 greenPanel();

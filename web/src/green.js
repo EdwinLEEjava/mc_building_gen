@@ -287,18 +287,55 @@ function greenReach(layers) {
 }
 // recompute the overlay inside `rect` (null = everywhere). T = Terrain (ground heights) or a Structure.
 // returns { ov, clip, maxY }: clip = the box whose blocks may have changed
+// 清除地表: cells of a clear layer lose the plants, snow and natural trees that stood on the ground (the terrain's own,
+// not placed buildings). A tree touched anywhere loses its whole connected trunk + natural leaves.
+const GREEN_CLEAR_R = 10;
+const greenClearTree = st => !!st && isTreePart(st) && !(st.includes('_leaves[') && st.includes('persistent=true'));
+function greenClearInto(T, S, clr, clip, ov) {
+  const dfs = clr.map(greenDensOf), on = (x, z) => dfs.some(d => d(x, z) >= 0.5);
+  const bb = S.box || S.bounds(), y0 = bb[0][1], y1 = bb[1][1], P = T.protect, R = GREEN_CLEAR_R;
+  const inC = (x, z) => x >= clip[0] && x <= clip[2] && z >= clip[1] && z <= clip[3];
+  const del = (x, y, z) => { if (inC(x, z)) ov.set(key3(x, y, z), null); };
+  const seen = new Set(); let n = 0;
+  for (let x = clip[0] - R; x <= clip[2] + R; x++) for (let z = clip[1] - R; z <= clip[3] + R; z++) {
+    if (!on(x, z)) continue;
+    let h;
+    if (T.inside) { if (!T.inside(x, z)) continue; h = T.H(x, z); }
+    else { h = y0 - 1; for (let y = y1; y >= y0; y--) { const st = S.get(x, y, z); if (st && isGround(st)) { h = y; break; } } }
+    for (let y = h + 1; y <= y1; y++) {
+      const st = S.get(x, y, z); if (!st || isAir(st)) continue;
+      const k = key3(x, y, z); if (isWater(st) || (P && P.has(k))) break;
+      if (greenClearTree(st)) {
+        if (seen.has(k)) continue;
+        const stack = [[x, y, z]];
+        while (stack.length && seen.size < 200000) {
+          const [a, b, c] = stack.pop(), kk = key3(a, b, c); if (seen.has(kk)) continue;
+          if (P && P.has(kk)) continue; if (!greenClearTree(S.get(a, b, c))) continue;
+          seen.add(kk); del(a, b, c); n++;
+          for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) if (dx || dy || dz) stack.push([a + dx, b + dy, c + dz]);
+        }
+        continue;
+      }
+      if (NOT_GROUND.test(st.split('[')[0]) || GREEN_SOFT.test(st)) { del(x, y, z); n++; continue; }
+      break;
+    }
+  }
+  return n;
+}
 function greenOverlay(T, layers, rect, ov) {
-  const S = T.S || T, vis = (layers || []).filter(L => L && L.visible !== false && L.tiles);
+  const S = T.S || T, vis = (layers || []).filter(L => L && L.visible !== false && L.tiles && !L.clear), clr = (layers || []).filter(L => L && L.visible !== false && L.tiles && L.clear);
   if (!rect || !ov) ov = new Map();
   let maxY = -1;
-  const all = greenBounds(vis), bb = S.box || S.bounds();
+  const all = greenBounds([...vis, ...clr]), bb = S.box || S.bounds();
   if (!rect) { if (!all) return { ov, clip: null, maxY }; rect = all; }
-  const { reach, spacing } = greenReach(vis), m = spacing + 2 * reach + 1;
+  const gr = greenReach(vis), reach = clr.length ? Math.max(gr.reach, GREEN_CLEAR_R) : gr.reach, spacing = gr.spacing, m = spacing + 2 * reach + 1;
   const clip = [Math.max(bb[0][0], rect[0] - m), Math.max(bb[0][2], rect[1] - m), Math.min(bb[1][0], rect[2] + m), Math.min(bb[1][2], rect[3] + m)];
   if (clip[0] > clip[2] || clip[1] > clip[3]) return { ov, clip: null, maxY };
   for (const k of [...ov.keys()]) { const i = k.indexOf(','), j = k.lastIndexOf(','), x = +k.slice(0, i), z = +k.slice(j + 1); if (x >= clip[0] && x <= clip[2] && z >= clip[1] && z <= clip[3]) ov.delete(k); }
-  if (!vis.length) return { ov, clip, maxY };
+  if (clr.length) greenClearInto(T, S, clr, clip, ov);
+  if (!vis.length) { for (const [k, st] of ov) if (st !== null) { const y = +k.split(',')[1]; if (y > maxY) maxY = y; } return { ov, clip, maxY }; }
   const dfs = vis.map(greenDensOf), own = new Map();
+  const cur = (x, y, z) => { const k = key3(x, y, z); return ov.has(k) && ov.get(k) === null ? undefined : S.get(x, y, z); };
   const owner = (x, z) => { const k = x + ',' + z; let o = own.get(k); if (o === undefined) { o = -1; for (let i = vis.length - 1; i >= 0; i--) if (dfs[i](x, z) > 0) { o = i; break; } own.set(k, o); } return o; };
   const tops = new Map(), y0 = bb[0][1], y1 = bb[1][1];
   const top = (x, z) => {
@@ -306,10 +343,10 @@ function greenOverlay(T, layers, rect, ov) {
     let y = null;
     if (T.inside) { if (T.inside(x, z) && !T.water[T.idx(x, z)]) { const h = T.H(x, z), st = S.get(x, h, z); if (h >= y0 && st && GREEN_SOIL.test(st)) y = h; } }
     else for (let yy = y1; yy >= y0; yy--) { const st = S.get(x, yy, z); if (!st || GREEN_SOFT.test(st)) continue; if (GREEN_SOIL.test(st)) y = yy; break; }
-    if (y != null) { const up = S.get(x, y + 1, z); if (up && !GREEN_SOFT.test(up)) y = null; }
+    if (y != null) { const up = cur(x, y + 1, z); if (up && !GREEN_SOFT.test(up)) y = null; }
     tops.set(k, y); return y;
   };
-  const can = (x, y, z) => { const st = S.get(x, y, z); return !st || GREEN_SOFT.test(st); }, hard = (x, y, z) => greenHard(S.get(x, y, z));
+  const can = (x, y, z) => { const st = cur(x, y, z); return !st || GREEN_SOFT.test(st); }, hard = (x, y, z) => greenHard(cur(x, y, z));
   const mine = new Set(), lx0 = clip[0] - reach - spacing, lz0 = clip[1] - reach - spacing, lx1 = clip[2] + reach + spacing, lz1 = clip[3] + reach + spacing;
   vis.forEach((L, i) => {
     greenPaint(L.recipe, { x0: lx0, z0: lz0, x1: lx1, z1: lz1, clip, seed: L.seed || 1, mine, top, can, hard,
@@ -317,14 +354,14 @@ function greenOverlay(T, layers, rect, ov) {
       ground: (x, z, y, st) => ov.set(key3(x, y, z), st),
       set: (x, y, z, st) => ov.set(key3(x, y, z), st) });
   });
-  for (const k of ov.keys()) { const y = +k.split(',')[1]; if (y > maxY) maxY = y; }
+  for (const [k, st] of ov) if (st !== null) { const y = +k.split(',')[1]; if (y > maxY) maxY = y; }
   return { ov, clip, maxY };
 }
 // run fn with the overlay written into S, then put S back exactly as it was
 function greenWith(S, ov, fn) {
   if (!ov || !ov.size) return fn();
   const prev = [];
-  for (const [k, st] of ov) { prev.push([k, S.blocks.get(k)]); S.blocks.set(k, st); }
+  for (const [k, st] of ov) { prev.push([k, S.blocks.get(k)]); if (st === null) S.blocks.delete(k); else S.blocks.set(k, st); }
   try { return fn(); } finally { for (const [k, st] of prev) { if (st === undefined) S.blocks.delete(k); else S.blocks.set(k, st); } }
 }
 
