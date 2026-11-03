@@ -10,16 +10,23 @@
 // French preset after Notre-Dame de Paris (128 × 48 m, vault 33 m, towers 69 m, flèche 96 m); the defaults are
 // that building at about 0.8 block per metre. Every size can be set on its own.
 // ---------------------------------------------------------------------------------------------
-const CATHEDRAL_STYLES = { french: '法式（兰斯 / 巴黎圣母院）', german: '德式（科隆）', italian: '意式（米兰）', spanish: '西班牙（塞维利亚）' };
+const CATHEDRAL_STYLES = { french: '法式（兰斯 / 巴黎圣母院）', german: '德式（科隆）', italian: '意式（米兰）', spanish: '西班牙（塞维利亚）', english: '英式（索尔兹伯里 / 林肯）', romanesque: '罗马式（施派尔 / 沃尔姆斯）' };
+const CATHEDRAL_ARCHES = { pointed: '尖拱（哥特）', round: '圆拱（罗马式）' };
 // a style = a set of starting values; every value can still be changed afterwards (the panel copies them in when the style changes)
 const CATHEDRAL_PRESETS = {
   french: { pinnacle_forest: false, facade: 'detailed', tower_top: 'flat', crossing: 'fleche', roof_style: 'pitched', campanile: false, court: false },
   german: { pinnacle_forest: true, flyer_levels: 2, rose: false, kings: false, roof: 'stone', facade: 'detailed', tower_top: 'openwork', crossing: 'turret', roof_style: 'pitched', campanile: false, court: false, nave_bays: 10, width: 15, aisle_width: 6, arcade_height: 15, gallery_height: 4, clerestory_height: 15, transept_depth: 4, chapels: 7, roof_pitch: 'steep', walls: 'warm', fleche_height: 30 },
   italian: { pinnacle_forest: true, facade: 'screen', tower_top: 'none', crossing: 'lantern', roof_style: 'pitched', campanile: false, court: false, nave_bays: 9, width: 19, aisle_width: 6, arcade_height: 16, gallery_height: 0, clerestory_height: 8, transept_depth: 4, east_end: 'apse', roof_pitch: 'normal', walls: 'marble', roof: 'stone', fleche_height: 30 },
+  // English Gothic: a long nave, single aisles, a big projecting transept, a square east end, a tall square crossing
+  // tower with a stone spire; flat-topped west towers, a screen of statues, few flyers
+  english: { arch: 'pointed', pinnacle_forest: false, flyer_levels: 1, rose: false, kings: true, facade: 'detailed', tower_top: 'flat', crossing: 'tower_spire', roof_style: 'pitched', campanile: false, court: false, nave_bays: 12, width: 13, aisles: 1, aisle_width: 6, transept_depth: 6, choir_bays: 5, east_end: 'flat', arcade_height: 11, gallery_height: 4, clerestory_height: 10, roof_pitch: 'steep', walls: 'stone', fleche_height: 50, tower_rise: 16 },
+  // Romanesque (Rhineland): round arches everywhere, thick plain walls, no flying buttresses or pinnacles, a square
+  // crossing tower, an apse with an ambulatory and three chapels, a gallery over the aisles, a low-pitched roof
+  romanesque: { arch: 'round', pinnacle_forest: false, pinnacles: false, flying_buttresses: false, flyer_levels: 1, rose: false, kings: false, statues: false, portal_orders: 3, facade: 'detailed', tower_top: 'flat', crossing: 'tower', roof_style: 'pitched', campanile: false, court: false, nave_bays: 8, width: 13, aisles: 1, aisle_width: 6, transept_depth: 2, choir_bays: 3, east_end: 'chevet', chapels: 3, arcade_height: 10, gallery_height: 5, clerestory_height: 11, roof_pitch: 'normal', walls: 'stone', roof: 'slate', fleche_height: 30, tower_rise: 14, louvers: true, dormers: false },
   spanish: { pinnacle_forest: false, facade: 'screen', tower_top: 'none', crossing: 'cimborio', roof_style: 'terrace', campanile: true, court: true, nave_bays: 9, width: 17, aisle_width: 7, arcade_height: 15, gallery_height: 0, clerestory_height: 10, transept_depth: 0, east_end: 'flat', walls: 'warm', roof: 'stone' },
 };
 const CATHEDRAL_TOWER_TOPS = { flat: '平顶 + 尖塔群（兰斯）', openwork: '镂空尖塔（科隆）', none: '无塔' };
-const CATHEDRAL_CROSSINGS = { fleche: '细尖塔（巴黎）', turret: '铜绿小尖塔（科隆）', lantern: '八角采光塔 + 金像（米兰）', cimborio: '抬高的方形采光塔（塞维利亚）', none: '无' };
+const CATHEDRAL_CROSSINGS = { tower: '方形交叉塔（罗马式 / 英式）', tower_spire: '方形交叉塔 + 石尖塔（索尔兹伯里）', fleche: '细尖塔（巴黎）', turret: '铜绿小尖塔（科隆）', lantern: '八角采光塔 + 金像（米兰）', cimborio: '抬高的方形采光塔（塞维利亚）', none: '无' };
 const CATHEDRAL_ROOF_STYLES = { pitched: '坡屋顶', terrace: '平台屋顶（带栏杆）' };
 // white marble (Milan); cathedral only
 const CATHEDRAL_MARBLE = { label: '白大理石', mix: [['calcite', 4], ['quartz_block', 2], ['diorite', 1]], plinth: 'polished_diorite', set: 'stone' };
@@ -28,9 +35,9 @@ const CATHEDRAL_WARM = { label: '暖黄砂岩', mix: [['smooth_sandstone', 4], [
 const CATHEDRAL_FACADES = { detailed: '精细双塔立面（扶壁、多层拱门、雕像、尖塔群）', screen: '屏风立面（无塔，米兰 / 塞维利亚）', simple: '简单（旧版平立面）' };
 const CATHEDRAL_EAST = { chevet: '回廊 + 放射小礼拜堂', apse: '半圆后殿', flat: '平直东端' };
 const CATHEDRAL_DEFAULT = {
-  style: 'french', facade: 'detailed', nave_bays: 9, bay: 8, width: 17, aisles: 2, aisle_width: 6, transept: true, transept_depth: 2, choir_bays: 4,
+  style: 'french', arch: 'pointed', facade: 'detailed', nave_bays: 9, bay: 8, width: 17, aisles: 2, aisle_width: 6, transept: true, transept_depth: 2, choir_bays: 4,
   east_end: 'chevet', chapels: 5, chapel_depth: 4, arcade_height: 12, gallery_height: 6, clerestory_height: 13, facade_extra: 2, tower_rise: 24,
-  rose: true, kings: true, statues: true, portal_orders: 6, flying_buttresses: true, flyer_levels: 1, gargoyles: true, louvers: true, dormers: false, pinnacles: true, fleche: true, fleche_height: 50, roof_pitch: 'medium',
+  rose: true, kings: true, statues: true, portal_orders: 6, flying_buttresses: true, flyer_levels: 1, louvers: true, dormers: false, pinnacles: true, fleche: true, fleche_height: 50, roof_pitch: 'medium',
   walls: 'white', roof: 'slate', glass: 'colored', interior: false, seed: 1,
 };
 // the French preset's sizes at 1 block per metre; the panel's 比例 multiplies these (bay counts stay)
@@ -39,7 +46,11 @@ const CATHEDRAL_RANGES = {
   nave_bays: [3, 14], bay: [4, 10], width: [7, 21], aisle_width: [3, 7], transept_depth: [0, 10], choir_bays: [1, 10], chapels: [0, 9], chapel_depth: [2, 6],
   portal_orders: [1, 6], flyer_levels: [1, 2], arcade_height: [5, 16], gallery_height: [0, 12], clerestory_height: [4, 16], facade_extra: [1, 12], tower_rise: [8, 60], fleche_height: [10, 90],
 };
-function cathedral(o = {}) {
+function cathedral(o = {}) {   // every arch (doors, windows, belfries) follows the style's arch shape while it builds
+  const arch = { ...CATHEDRAL_DEFAULT, ...(CATHEDRAL_PRESETS[o.style] || {}), ...o }.arch;
+  return gothicWithArch(arch, () => _cathedral(o));
+}
+function _cathedral(o) {
   const p = { ...CATHEDRAL_DEFAULT, ...(CATHEDRAL_PRESETS[o.style] || {}), ...o };
   const cl = (v, a, b) => Math.max(a, Math.min(b, v));
   const report = [], adjust = [];
@@ -286,7 +297,7 @@ function cathedral(o = {}) {
     const us = wide ? [-1, 0, 1] : [0];
     for (const u of us) for (let y = y0; y <= y1 + 1; y++) if (!isWall(S.get(...at(u, y)))) return false;
     if (wide) {
-      for (let y = y0; y < y1; y++) for (const u of [-1, 1]) S.set(...at(u, y), pane(...at(u, y), ax));
+      for (let y = y0; y < y1; y++) for (const u of (p.arch === 'round' ? [-1, 0, 1] : [-1, 1])) S.set(...at(u, y), pane(...at(u, y), ax));   // round arches: one light, no mullion
       S.set(...at(0, y1), pane(...at(0, y1), ax));
       for (const u of [-1, 1]) S.set(...at(u, y1), stair(SM.stairs, alongX ? (u < 0 ? 'west' : 'east') : (u < 0 ? 'north' : 'south'), 'top'));
     } else for (let y = y0; y <= y1; y++) S.set(...at(0, y), pane(...at(0, y), ax));
@@ -338,7 +349,7 @@ function cathedral(o = {}) {
   }
 
   // ---- flying buttresses: a pier with a pinnacle outside the aisles, an arch of stone up to the clerestory ----
-  let nf = 0, nf2 = 0, ngar = 0; const FLY = [];
+  let nf = 0, nf2 = 0; const FLY = [];
   if (p.flying_buttresses && !detailed) {   // the detailed cathedral draws its flyers with gothicFlyer (after the walls)
     const yp = Math.max(IRT, OT + 1 + lean(AW)) + 2, yw = NT - 2;
     for (let xb = 0; xb <= xE; xb += bay) {
@@ -419,6 +430,11 @@ function cathedral(o = {}) {
       for (const [dx, dz] of [[-R0 - 1, -R0 - 1], [-R0 - 1, R0 + 1], [R0 + 1, -R0 - 1], [R0 + 1, R0 + 1]]) { gothicPinnacleAt(S, fo, cx + dx, TT + 1, s * GL.tc + dz, 4, false, GF.mine); pn++; }
     }
     if (crossing === 'turret') fTop = gothicSpire(S, { frame: 'oxidized_cut_copper', stairs: 'oxidized_cut_copper_stairs', slab: 'oxidized_cut_copper_slab', wall: 'prismarine_wall' }, xcm, ridge - 2, 0, 3, R.fleche_height, 'open', GF.mine, null, 7);   // an open copper stage, then the needle
+    if (crossing === 'tower' || crossing === 'tower_spire') {   // a square tower over the crossing (Romanesque, English)
+      const v1 = ridge + Math.max(12, W + 2), sp = crossing === 'tower_spire' ? R.fleche_height : 0;
+      fTop = Math.max(fTop, gothicCrossingTower(S, { ...fo, ...XM }, xc0, xc1, hw, NT + 1, ridge + 1, v1, sp, GF.mine));
+      report.push(`交叉塔：${W}×${W}，塔顶 ${v1}` + (sp ? `，石尖塔高 ${sp}` : ''));
+    }
     if (crossing === 'lantern') fTop = gothicLantern(S, XM, xcm, NT + 1, 0, Math.max(3, Math.min(hw - 1, 7)), ridge - NT + 6, R.fleche_height, GF.mine, (x, y, z, ax) => pane(x, y, z, ax));
     if (crossing === 'cimborio') {                       // Seville: the crossing raised as a lit square box with a balustrade
       const h0 = NT + 1, h1 = NT + 9;
@@ -463,10 +479,10 @@ function cathedral(o = {}) {
       if (hasT && xc1 + 2 < xE) gothicSideWall(S, fc, s, hw, xc1 + 2, xE, bay, NT, GF.mine, IRT + 1);
     }
     if (p.flying_buttresses) {
-      const yp = Math.max(IRT, OT + 1 + lean(AW)) + 2, yw = NT - 2, fl = { ...fo, plinth: WM.plinth, pinnacles: true, flyerLevels: R.flyer_levels, wallLow: IRT, gargoyles: p.gargoyles !== false };
+      const yp = Math.max(IRT, OT + 1 + lean(AW)) + 2, yw = NT - 2, fl = { ...fo, plinth: WM.plinth, pinnacles: true, flyerLevels: R.flyer_levels, wallLow: IRT };
       for (let xb = 0; xb <= xE; xb += bay) {
         if (xb < TL + 1 || inCross(xb)) continue;
-        for (const s of [-1, 1]) { if (zone(xb, s * (edge + 1)) || zone(xb, s * (edge + 3))) continue; const fr = gothicFlyer(S, fl, s, xb, edge, yp, hw + 1, yw, RH, GF.mine, fo.forest && NA === 2 ? hw + AW : null); nf++; pn++; nf2 += fr.levels === 2; ngar += fr.gargoyles; }
+        for (const s of [-1, 1]) { if (zone(xb, s * (edge + 1)) || zone(xb, s * (edge + 3))) continue; const fr = gothicFlyer(S, fl, s, xb, edge, yp, hw + 1, yw, RH, GF.mine, fo.forest && NA === 2 ? hw + AW : null); nf++; pn++; nf2 += fr.levels === 2; }
       }
     }
     // east end: a stepped pier with a pinnacle between every two radiating chapels (or round the apse)
@@ -530,10 +546,10 @@ function cathedral(o = {}) {
   report.push(...matRep);
   fixConnections(S); stairShapes(S);
   const [[bx0, , bz0], [bx1, by1, bz1]] = S.bounds();
-  report.unshift(`主教座堂（${CATHEDRAL_STYLES[p.style] || CATHEDRAL_STYLES.french}）：中殿 ${NB} 开间 × ${bay} 格、宽 ${W}；每侧侧廊 ${NA} 条（各宽 ${AW}）` +
+  report.unshift(`主教座堂（${CATHEDRAL_STYLES[p.style] || CATHEDRAL_STYLES.french}${p.arch === 'round' && p.style !== 'romanesque' ? '，圆拱' : ''}）：中殿 ${NB} 开间 × ${bay} 格、宽 ${W}；每侧侧廊 ${NA} 条（各宽 ${AW}）` +
     (hasT ? `；耳堂伸出侧廊外 ${tdep} 格` : '') + `；唱诗堂 ${CB} 开间；东端${CATHEDRAL_EAST[east]}` + (nch ? `（${nch} 个小礼拜堂）` : '') +
     `；剖面：拱廊 ${AH}` + (GH ? ` + 楼廊 ${GH}` : '') + ` + 高侧窗 ${CH}，中殿墙高 ${NT}、屋脊 ${ridge}；西立面高 ${FT}，双塔高 ${TT}` + (fTop ? `，交叉处尖塔顶 ${fTop}` : '') +
-    `；窗 ${nw} 扇、玫瑰窗 ${roses} 扇、飞扶壁 ${nf} 道` + (nf2 ? `（其中 ${nf2} 道双层）` : '') + (ngar ? `、滴水兽 ${ngar} 个` : '') + (ndorm ? `、老虎窗 ${ndorm} 个` : '') + `；总尺寸 ${bx1 - bx0 + 1}×${bz1 - bz0 + 1}，高 ${by1 + 1}` + (p.interior ? '；内部有祭坛、唱诗席' : ''));
-  const spec = { ...p, ...R, facade: detailed ? 'detailed' : 'simple', width: W, aisles: NA, east_end: east, chapels: nch || R.chapels };
+    `；窗 ${nw} 扇、玫瑰窗 ${roses} 扇、飞扶壁 ${nf} 道` + (nf2 ? `（其中 ${nf2} 道双层）` : '') + (ndorm ? `、老虎窗 ${ndorm} 个` : '') + `；总尺寸 ${bx1 - bx0 + 1}×${bz1 - bz0 + 1}，高 ${by1 + 1}` + (p.interior ? '；内部有祭坛、唱诗席' : ''));
+  const spec = { ...p, ...R, arch: p.arch === 'round' ? 'round' : 'pointed', facade: detailed ? 'detailed' : 'simple', width: W, aisles: NA, east_end: east, chapels: nch || R.chapels };
   return { S, foot: [bx0, bx1, bz0, bz1], tags: ['landmark', 'cathedral'], report, spec, adjust };
 }
