@@ -1700,8 +1700,28 @@ function setGver(v) {
   GVER = MCGen.GAME_VERSIONS.some(g => g.id === v) ? v : MCGen.GAME_VERSION_DEFAULT;
   try { localStorage.setItem('mcgen.gver', GVER); } catch (e) {}
   const sel = document.getElementById('gver'); if (sel && sel.value !== GVER) sel.value = GVER;
-  MCTX = null; if (model) rebuild(); gverHint(); if (typeof greenMixRefresh === 'function') greenMixRefresh();
+  MCGen.setGameVersion(GVER);
+  MCTX = null; if (model) rebuild(); gverHint(); if (typeof greenMixRefresh === 'function') greenMixRefresh(); gverMark();
+  if (typeof curMode === 'function' && curMode() === 'comp' && typeof ctype !== 'undefined' && ctype !== 'house' && typeof runComp === 'function') runComp();
+  else if (typeof curMode === 'function' && curMode() === 'layout' && typeof TOWN !== 'undefined' && TOWN) { const el = document.getElementById('t_status'); if (el) el.textContent = `目标版本改为 ${MCGen.GAME_VERSIONS.find(g => g.id === GVER).label}：预览和导出已替换新方块；重新生成后会直接用这个版本有的方块。`; }
 }
+// option lists: blocks the target version lacks are greyed out with the version they need
+function gverOptOK(v) {
+  if (!v || !/^[a-z_:]+$/.test(v)) return null;
+  const names = [v, v + '_planks', v + 's', v.startsWith('leaf:') ? v.slice(5) + '_leaves' : null, /:[ml]$/.test(v) ? v.split(':')[0] + '_log' : null].filter(Boolean);
+  let need = null; for (const n of names) { const s = MCGen.verSince(n); if (s && (!need || s > need)) need = s; }
+  return need;
+}
+function gverMark(root) {
+  (root || document).querySelectorAll('select:not(#gver) option').forEach(o => {
+    if (o.dataset.gv === undefined) { const need = gverOptOK(o.value); o.dataset.gv = need || ''; o.dataset.gt = o.textContent; }
+    const need = o.dataset.gv; if (!need) return;
+    const ok = MCGen.verOK(need === '1.21.5' ? 'bush' : need === '1.21.4' ? 'pale_oak_planks' : need === '1.21' ? 'tuff_bricks' : 'short_grass');
+    o.disabled = !ok; o.textContent = ok ? o.dataset.gt : `${o.dataset.gt}（需 ${need}+）`;
+  });
+}
+MCGen.setGameVersion(GVER);
+{ let t = 0; new MutationObserver(() => { clearTimeout(t); t = setTimeout(() => gverMark(), 50); }).observe(document.body, { childList: true, subtree: true }); }
 function meshCtx(model) {
   if (MCTX && MCTX.model === model && MCTX.n === model.palette.length && MCTX.tex === TEX.glTex && MCTX.ver === GVER) return MCTX;
   const { W, H, L, palette, data } = model;
@@ -2560,6 +2580,7 @@ function genWorkerMain() {
   self.onmessage = e => {
     const d = e.data;
     if (d.init) { M.initData(d.init); return; }
+    if (d.gver) M.setGameVersion(d.gver);
     try { const { res, transfer } = H[d.fn](d.args); self.postMessage({ id: d.id, ok: true, res }, transfer || []); }
     catch (err) { self.postMessage({ id: d.id, ok: false, err: String(err && err.message || err) }); }
   };
@@ -2579,7 +2600,7 @@ const GW = (() => {
     } catch (e) { console.warn('no worker, generating on the main thread', e); broken = true; w = null; }
     return w;
   }
-  const send = (fn, args) => new Promise((resolve, reject) => { const id = ++seq; waiting.set(id, { resolve, reject }); w.postMessage({ id, fn, args }); });
+  const send = (fn, args) => new Promise((resolve, reject) => { const id = ++seq; waiting.set(id, { resolve, reject }); w.postMessage({ id, fn, args, gver: GVER }); });
   function run(key, job) {
     const lane = lanes.get(key);
     lane.running = true;
@@ -3000,7 +3021,7 @@ document.querySelectorAll('.gmix').forEach(box => {
   box.addEventListener('change', e => upd(e, e.target.dataset.k === 'n'));
   box.addEventListener('click', e => {
     const inp = $(box.dataset.for); let list = []; try { list = JSON.parse(inp.value || '[]'); } catch (er) { }
-    if (e.target.classList.contains('gmadd')) { const used = new Set(list.map(x => x[0])), k = Object.keys(MCGen[box.dataset.opts]).find(n => !used.has(n)) || Object.keys(MCGen[box.dataset.opts])[0]; list.push([k, 1]); }
+    if (e.target.classList.contains('gmadd')) { const used = new Set(list.map(x => x[0])), k = Object.keys(MCGen[box.dataset.opts]).find(n => !used.has(n) && !gverOptOK(n)) || Object.keys(MCGen[box.dataset.opts]).find(n => !used.has(n)) || Object.keys(MCGen[box.dataset.opts])[0]; list.push([k, 1]); }
     else if (e.target.dataset.k === 'x') list.splice(+e.target.closest('.gmrow').dataset.i, 1);
     else return;
     e.preventDefault(); inp.value = JSON.stringify(list); greenMixRender(box); box.closest('.ctype').dispatchEvent(new Event('change'));

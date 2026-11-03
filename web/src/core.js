@@ -101,7 +101,8 @@ function cmp(a, b) {
 }
 function pickColor(slot, hexs, companions = 2, radius = 6.0) {
   const target = oklab(hexs);
-  const opts = sortBy(OPTIONS[slot], o => de(o.lab, target));
+  const pool = typeof GAME_VER !== 'undefined' && GAME_VER !== GAME_VERSION_DEFAULT ? OPTIONS[slot].filter(o => verOK(o.key) && Object.values(o.roles || {}).every(r => typeof r !== 'string' || verOK(r))) : OPTIONS[slot];
+  const opts = sortBy(pool.length ? pool : OPTIONS[slot], o => de(o.lab, target));
   const main = opts[0];
   const comp = opts.slice(1).filter(o => o.cls === main.cls && core(o.key) === core(main.key) && de(o.lab, main.lab) < radius
     && o.key !== main.key && slot !== 'frame').slice(0, companions);

@@ -105,3 +105,24 @@ function verReport(palette, data, ver) {
   }
   return [...agg].map(([k, n]) => { const [a, b] = k.split('>'); return [a, b, n]; }).sort((x, y) => y[2] - x[2]);
 }
+
+// ---- the target version also steers choices made while generating (colour matching, option lists) ----
+let GAME_VER = GAME_VERSION_DEFAULT;
+function setGameVersion(v) {
+  const nv = GAME_VERSIONS.some(g => g.id === v) ? v : GAME_VERSION_DEFAULT; if (nv === GAME_VER) return;
+  GAME_VER = nv;
+  // shapes cached under the old version must be rebuilt
+  for (const c of [typeof _houseCache !== 'undefined' && _houseCache, typeof _lmCache !== 'undefined' && _lmCache, typeof _churchFp !== 'undefined' && _churchFp, typeof _greenTreeCache !== 'undefined' && _greenTreeCache]) if (c) c.clear();
+}
+// may this block (bare name or full state) be used in the target version?
+function verOK(name, ver) {
+  const v = ver || GAME_VER; if (verRank(v) >= 4) return true;
+  const st = String(name).includes(':') ? String(name) : 'minecraft:' + name;
+  return verState(st, v) === st;
+}
+// the first version a block exists in (label), or null when it exists in all of them
+function verSince(name) {
+  if (verOK(name, GAME_VERSIONS[GAME_VERSIONS.length - 1].id)) return null;
+  for (let i = GAME_VERSIONS.length - 1; i >= 0; i--) if (verOK(name, GAME_VERSIONS[i].id)) return GAME_VERSIONS[i].id;
+  return GAME_VERSIONS[0].id;
+}
