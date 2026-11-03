@@ -15,14 +15,15 @@
 // windows, belfries, the facade's storey heights — follows it without passing it through each call.
 let _gothicArch = 'pointed';
 function gothicWithArch(shape, f) { const old = _gothicArch; _gothicArch = shape === 'round' ? 'round' : 'pointed'; try { return f(); } finally { _gothicArch = old; } }
+const _gothicRoundR2 = a => a >= 2.5 ? a * a - 0.25 : (a - 0.5) * (a - 0.5) + 0.6;   // half-circle radius² for a half-width a: wide arches get a flat 3-block crown (reads round, not pointed)
 function gothicArchIn(du, v, w, v0, hs) {           // inside the arch: width w, springing at hs
   const a = w / 2, x = Math.abs(du);
   if (x > a - 0.5 || v < v0) return false;
   if (v <= hs) return true;
-  if (_gothicArch === 'round') return (v - hs) * (v - hs) + x * x <= (a - 0.5) * (a - 0.5) + 0.6;
+  if (_gothicArch === 'round') return (v - hs) * (v - hs) + x * x <= _gothicRoundR2(a);
   return v + 0.5 <= hs + Math.sqrt(Math.max(0, w * w - (x + a) * (x + a))) + 0.35;
 }
-const gothicArchTop = (w, hs) => hs + (_gothicArch === 'round' ? Math.max(0, Math.floor(w / 2 - 0.5)) : Math.floor(Math.sqrt(3) * w / 2));
+const gothicArchTop = (w, hs) => hs + (_gothicArch === 'round' ? Math.max(0, Math.floor(Math.sqrt(_gothicRoundR2(w / 2)))) : Math.floor(Math.sqrt(3) * w / 2));
 // facade materials per wall style (frame, stairs, slab, wall post, statue head, capital, niche back)
 const GOTHIC_FACADE_MATS = {
   white: { frame: 'polished_diorite', stairs: 'polished_diorite_stairs', slab: 'polished_diorite_slab', wall: 'diorite_wall', head: 'calcite', capital: 'chiseled_stone_bricks', niche: 'smooth_stone' },
@@ -119,12 +120,23 @@ function gothicKit(S, o, W, dir, ax, mine) {
     for (let v = v0; v <= AT(iw, hs); v++) for (let du = -ia; du <= ia; du++) {
       if (!IN(du, v, iw, v0, hs)) continue;
       const two = ia >= 2, sub = du < 0 ? -1 : 1, sd = du - sub * (ia + 1) / 2;
-      const inSub = two ? (ia >= 4 ? du !== 0 && IN(sd, v, ia, v0 + 1, hs - 3) : v >= v0 + 1 && (du !== 0 || v > hs + ia)) : v <= hs;   // with no room for an oculus: Y-tracery, one mullion that stops below the head
-      const rr = Math.hypot(du, v - (hs + 4)), oc = ia >= 4 && rr >= 1.6 && rr <= 3.2;   // an oculus only where a real ring fits (glass ring round a stone hub; smaller ones read as a cross)
+      const round = _gothicArch === 'round';
+      const inSub = round ? (ia >= 4 ? du !== 0 && IN(sd, v, ia, v0 + 1, hs - (ia >> 1)) : true)   // Romanesque: one open round-headed light; a wide one is two lights under a solid tympanum
+        : two ? (ia >= 4 ? du !== 0 && IN(sd, v, ia, v0 + 1, hs - 3) : v >= v0 + 1 && (du !== 0 || v > hs + ia)) : v <= hs;   // with no room for an oculus: Y-tracery, one mullion that stops below the head
+      const rr = Math.hypot(du, v - (hs + 4)), oc = !round && ia >= 4 && rr >= 1.6 && rr <= 3.2;   // an oculus only where a real ring fits (glass ring round a stone hub; smaller ones read as a cross)
       if (inSub || oc) { setD(uc + du, v, dIn - 1, 'glass'); HOLE.set(k2(uc + du, v), 'glass'); }
     }
     const gb = AT(w, hs) - 1, a = w >> 1;
-    if (_gothicArch === 'round') return;               // Romanesque: no gablet over the window
+    if (_gothicArch === 'round') {                     // Romanesque: no gablet; round the head off with upside-down stairs at its shoulders
+      if (ia < 4) ATT.push(() => {
+        const half = v => { let r = -1; for (let du = 0; du <= ia; du++) if (HOLE.get(k2(uc + du, v)) === 'glass') r = du; return r; };
+        for (let v = hs + 1; v <= AT(iw, hs) + 1; v++) {
+          const r = half(v), rp = half(v - 1);
+          for (let k = r + 1; k <= rp; k++) for (const sg of [-1, 1]) { const u = uc + sg * k; if (HOLE.has(k2(u, v))) continue; const d = getD(u, v); if (d !== undefined) put(u, v, d, st(FST, sg < 0 ? dir.un : dir.up, 'top')); }
+        }
+      });
+      return;
+    }
     for (let v = gb; v <= Math.min(gb + a + 2, vMax); v++) for (let du = -a; du <= a; du++) if (v <= gb + a + 2 - Math.round(Math.abs(du) * (a + 2) / a) && (free || getD(uc + du, v) !== undefined) && !HOLE.has(k2(uc + du, v))) setD(uc + du, v, Math.max(getD(uc + du, v) ?? base + 1, base + 1), 'frame');
     if (gb + a + 4 <= vMax) ATT.push(() => { put(uc, gb + a + 3, base + 1, post()); put(uc, gb + a + 4, base + 1, rod()); });
   };

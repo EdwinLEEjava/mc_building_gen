@@ -22,7 +22,7 @@ const CATHEDRAL_PRESETS = {
   english: { arch: 'pointed', pinnacle_forest: false, flyer_levels: 1, rose: false, kings: true, facade: 'detailed', tower_top: 'flat', crossing: 'tower_spire', roof_style: 'pitched', campanile: false, court: false, nave_bays: 12, width: 13, aisles: 1, aisle_width: 6, transept_depth: 6, choir_bays: 5, east_end: 'flat', arcade_height: 11, gallery_height: 4, clerestory_height: 10, roof_pitch: 'steep', walls: 'stone', fleche_height: 50, tower_rise: 16 },
   // Romanesque (Rhineland): round arches everywhere, thick plain walls, no flying buttresses or pinnacles, a square
   // crossing tower, an apse with an ambulatory and three chapels, a gallery over the aisles, a low-pitched roof
-  romanesque: { arch: 'round', pinnacle_forest: false, pinnacles: false, flying_buttresses: false, flyer_levels: 1, rose: false, kings: false, statues: false, portal_orders: 3, facade: 'detailed', tower_top: 'flat', crossing: 'tower', roof_style: 'pitched', campanile: false, court: false, nave_bays: 8, width: 13, aisles: 1, aisle_width: 6, transept_depth: 2, choir_bays: 3, east_end: 'chevet', chapels: 3, arcade_height: 10, gallery_height: 5, clerestory_height: 8, roof_pitch: 'normal', walls: 'stone', roof: 'slate', fleche_height: 30, tower_rise: 14, louvers: true, dormers: false },
+  romanesque: { arch: 'round', pinnacle_forest: false, pinnacles: false, flying_buttresses: false, flyer_levels: 1, rose: false, kings: false, statues: false, portal_orders: 3, facade: 'detailed', tower_top: 'flat', crossing: 'tower', roof_style: 'pitched', campanile: false, court: false, nave_bays: 8, width: 13, aisles: 1, aisle_width: 6, transept_depth: 2, choir_bays: 3, east_end: 'chevet', chapels: 3, arcade_height: 10, gallery_height: 5, clerestory_height: 11, roof_pitch: 'normal', walls: 'stone', roof: 'slate', fleche_height: 30, tower_rise: 14, louvers: true, dormers: false },
   spanish: { pinnacle_forest: false, facade: 'screen', tower_top: 'none', crossing: 'cimborio', roof_style: 'terrace', campanile: true, court: true, nave_bays: 9, width: 17, aisle_width: 7, arcade_height: 15, gallery_height: 0, clerestory_height: 10, transept_depth: 0, east_end: 'flat', walls: 'warm', roof: 'stone' },
 };
 const CATHEDRAL_TOWER_TOPS = { flat: '平顶 + 尖塔群（兰斯）', openwork: '镂空尖塔（科隆）', none: '无塔' };
@@ -297,7 +297,7 @@ function _cathedral(o) {
     const us = wide ? [-1, 0, 1] : [0];
     for (const u of us) for (let y = y0; y <= y1 + 1; y++) if (!isWall(S.get(...at(u, y)))) return false;
     if (wide) {
-      for (let y = y0; y < y1; y++) for (const u of [-1, 1]) S.set(...at(u, y), pane(...at(u, y), ax));
+      for (let y = y0; y < y1; y++) for (const u of (p.arch === 'round' ? [-1, 0, 1] : [-1, 1])) S.set(...at(u, y), pane(...at(u, y), ax));   // round arches: one light, no mullion
       S.set(...at(0, y1), pane(...at(0, y1), ax));
       for (const u of [-1, 1]) S.set(...at(u, y1), stair(SM.stairs, alongX ? (u < 0 ? 'west' : 'east') : (u < 0 ? 'north' : 'south'), 'top'));
     } else for (let y = y0; y <= y1; y++) S.set(...at(0, y), pane(...at(0, y), ax));
