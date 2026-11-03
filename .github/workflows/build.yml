@@ -1,0 +1,64 @@
+# 每个 PR 和 main 上的每次提交：从源码生成 viewer/index.html，跑 JS ↔ Python 一致性测试。
+# main 上通过后，把生成的页面发布到 GitHub Pages（固定网址，别人打开就能用），并作为附件保存。
+name: build
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: 生成 web/mcgen.js 与 viewer/index.html
+        run: python build_viewer.py
+      - name: 一致性测试（Python 参考实现 vs JS）
+        run: |
+          python web/test/make_specs.py
+          python web/test/py_run.py
+          node web/test/js_run.js | tee js_run.log
+          grep -q " bad 0 " js_run.log
+      - name: 主教座堂四种风格冒烟测试
+        run: |
+          node -e "
+          const M = require('./web/mcgen.js');
+          for (const style of ['french', 'german', 'italian', 'spanish']) {
+            const r = M.cathedral({ style });
+            const c = M.checkPlacement(r.S);
+            console.log(style, r.S.blocks.size, 'issues', c.total, 'adjust', r.adjust.length);
+            if (c.total || r.adjust.length) process.exit(1);
+          }"
+      - name: 保存生成的页面（PR 里可下载试用）
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcgen-viewer
+          path: viewer/index.html
+      - name: 准备 Pages 内容
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: mkdir -p _site && cp viewer/index.html _site/index.html
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with: { path: _site }
+  pages:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
