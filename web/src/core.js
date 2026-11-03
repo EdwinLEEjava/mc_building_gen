@@ -234,8 +234,14 @@ function currentRoles(hb) {
 }
 
 // Sponge Schematic v2 (uncompressed NBT bytes; gzip them before saving), same layout as save_schem()
-function schemNBT(S, dataVersion = 3953) {
+// ver = target game version (see version.js): blocks newer than it are swapped and DataVersion follows it
+function schemNBT(S, dataVersion, ver) {
   const m = S.toModel(), out = [], enc = new TextEncoder();
+  if (dataVersion == null) dataVersion = verDV(ver || GAME_VERSION_DEFAULT);
+  if (ver && verRank(ver) < 4) {                       // swap, then merge states that became equal
+    const pal = new Map(), re = m.palette.map(st => { const s = verState(st, ver); if (!pal.has(s)) pal.set(s, pal.size); return pal.get(s); });
+    m.data = m.data.map(i => re[i]); m.palette = [...pal.keys()];
+  }
   const u8 = v => out.push(v & 255), u16 = v => { u8(v >> 8); u8(v); }, i32 = v => { u8(v >>> 24); u8(v >>> 16); u8(v >>> 8); u8(v); };
   const str = t => { const b = enc.encode(t); u16(b.length); for (const x of b) out.push(x); };
   const tag = (type, name) => { u8(type); str(name); };

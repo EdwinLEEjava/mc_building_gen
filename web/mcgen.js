@@ -429,8 +429,14 @@ function currentRoles(hb) {
 }
 
 // Sponge Schematic v2 (uncompressed NBT bytes; gzip them before saving), same layout as save_schem()
-function schemNBT(S, dataVersion = 3953) {
+// ver = target game version (see version.js): blocks newer than it are swapped and DataVersion follows it
+function schemNBT(S, dataVersion, ver) {
   const m = S.toModel(), out = [], enc = new TextEncoder();
+  if (dataVersion == null) dataVersion = verDV(ver || GAME_VERSION_DEFAULT);
+  if (ver && verRank(ver) < 4) {                       // swap, then merge states that became equal
+    const pal = new Map(), re = m.palette.map(st => { const s = verState(st, ver); if (!pal.has(s)) pal.set(s, pal.size); return pal.get(s); });
+    m.data = m.data.map(i => re[i]); m.palette = [...pal.keys()];
+  }
   const u8 = v => out.push(v & 255), u16 = v => { u8(v >> 8); u8(v); }, i32 = v => { u8(v >>> 24); u8(v >>> 16); u8(v >>> 8); u8(v); };
   const str = t => { const b = enc.encode(t); u16(b.length); for (const x of b) out.push(x); };
   const tag = (type, name) => { u8(type); str(name); };
@@ -447,6 +453,114 @@ function schemNBT(S, dataVersion = 3953) {
   tag(10, 'Metadata'); tag(8, 'Generator'); str('mcgen-prototype'); u8(0);
   u8(0);
   return { bytes: new Uint8Array(out), W: m.W, H: m.H, L: m.L, kinds: m.palette.length };
+}
+
+// ---- target game version: blocks newer than the chosen version are swapped for the closest older ones ----
+// Generation always uses the newest block names; the swap happens only when the model is shown or exported,
+// so a project keeps its original blocks and switching back to the newest version loses nothing.
+// dv = the DataVersion written into .schem: the lowest release of the range, so every game in it can read the file
+// (newer games upgrade older files themselves).
+const GAME_VERSIONS = [
+  { id: '1.21.5', label: '1.21.5 及以上', dv: 4325, rank: 4 },
+  { id: '1.21.4', label: '1.21.4', dv: 4189, rank: 3 },
+  { id: '1.21', label: '1.21 – 1.21.3', dv: 3953, rank: 2 },
+  { id: '1.20.3', label: '1.20.3 – 1.20.6', dv: 3698, rank: 1 },
+];
+const GAME_VERSION_DEFAULT = '1.21.5';
+const verRank = id => (GAME_VERSIONS.find(v => v.id === id) || GAME_VERSIONS[0]).rank;
+const verDV = id => (GAME_VERSIONS.find(v => v.id === id) || GAME_VERSIONS[0]).dv;
+
+// [rank the block appeared in, name regex, replacement]; replacement = name string ('' = remove, '$1' groups allowed)
+// or a function (match, props) -> [name, props] | ''. Props are kept when the replacement takes the same ones.
+const _OX = '((?:waxed_)?(?:exposed_|weathered_|oxidized_)?)';
+const VER_SWAPS = [
+  // 1.21.5 Spring to Life
+  [4, /^bush$/, 'short_grass'],
+  [4, /^firefly_bush$/, 'short_grass'],
+  [4, /^(short|tall)_dry_grass$/, 'dead_bush'],
+  [4, /^leaf_litter$/, ''],
+  [4, /^cactus_flower$/, ''],
+  [4, /^wildflowers$/, () => ['dandelion', {}]],
+  [4, /^test_(block|instance_block)$/, ''],
+  // 1.21.4 The Garden Awakens
+  [3, /^(stripped_)?pale_oak_(.+)$/, (m, p) => [(m[1] || '') + 'dark_oak_' + m[2], p]],
+  [3, /^pale_moss_block$/, 'moss_block'],
+  [3, /^pale_moss_carpet$/, () => ['moss_carpet', {}]],
+  [3, /^pale_hanging_moss$/, ''],
+  [3, /^creaking_heart$/, () => ['dark_oak_log', { axis: 'y' }]],
+  [3, /^resin_brick_(stairs|slab|wall)$/, (m, p) => ['brick_' + m[1], p]],
+  [3, /^resin_bricks$/, 'bricks'],
+  [3, /^chiseled_resin_bricks$/, 'bricks'],
+  [3, /^resin_block$/, 'orange_terracotta'],
+  [3, /^resin_clump$/, ''],
+  [3, /^open_eyeblossom$/, 'oxeye_daisy'],
+  [3, /^closed_eyeblossom$/, 'allium'],
+  [3, /^potted_(open|closed)_eyeblossom$/, 'potted_oxeye_daisy'],
+  // 1.21 Tricky Trials
+  [2, /^tuff_(stairs|slab|wall)$/, (m, p) => ['andesite_' + m[1], p]],
+  [2, /^polished_tuff_(stairs|slab)$/, (m, p) => ['polished_andesite_' + m[1], p]],
+  [2, /^polished_tuff_wall$/, (m, p) => ['andesite_wall', p]],
+  [2, /^polished_tuff$/, 'polished_andesite'],
+  [2, /^tuff_brick_(stairs|slab|wall)$/, (m, p) => ['stone_brick_' + m[1], p]],
+  [2, /^tuff_bricks$/, 'stone_bricks'],
+  [2, /^chiseled_tuff(_bricks)?$/, 'chiseled_stone_bricks'],
+  [2, new RegExp('^' + _OX + 'chiseled_copper$'), (m) => [m[1] + 'cut_copper', {}]],
+  [2, new RegExp('^' + _OX + 'copper_grate$'), (m) => [m[1] + 'cut_copper', {}]],
+  [2, new RegExp('^' + _OX + 'copper_bulb$'), () => ['glowstone', {}]],
+  [2, new RegExp('^' + _OX + 'copper_door$'), (m, p) => ['iron_door', p]],
+  [2, new RegExp('^' + _OX + 'copper_trapdoor$'), (m, p) => ['iron_trapdoor', p]],
+  [2, /^(crafter|vault|trial_spawner|heavy_core)$/, ''],
+];
+
+function _parseSt(st) {
+  const s = st.startsWith('minecraft:') ? st.slice(10) : st, i = s.indexOf('[');
+  const name = i < 0 ? s : s.slice(0, i), props = {};
+  if (i >= 0) for (const kv of s.slice(i + 1, -1).split(',')) { const j = kv.indexOf('='); if (j > 0) props[kv.slice(0, j)] = kv.slice(j + 1); }
+  return [name, props];
+}
+const _fmtSt = (name, props) => { const ks = Object.keys(props); return 'minecraft:' + name + (ks.length ? '[' + ks.map(k => k + '=' + props[k]).join(',') + ']' : ''); };
+
+const _verCache = new Map();
+// state string -> state string for the target version ('minecraft:air' when the block is dropped)
+function verState(st, ver) {
+  const rank = verRank(ver || GAME_VERSION_DEFAULT);
+  if (rank >= 4 || !st) return st;
+  const ck = rank + '|' + st; if (_verCache.has(ck)) return _verCache.get(ck);
+  let [name, props] = _parseSt(st), out = st;
+  for (let guard = 0; guard < 4; guard++) {           // a swap may land on a block that is itself too new
+    let hit = false;
+    for (const [r, re, to] of VER_SWAPS) {
+      if (r <= rank) continue;
+      const m = name.match(re); if (!m) continue;
+      hit = true;
+      if (to === '') { name = 'air'; props = {}; break; }
+      if (typeof to === 'function') [name, props] = to(m, props);
+      else name = name.replace(re, to);
+      break;
+    }
+    if (!hit || name === 'air') break;
+  }
+  if (name === 'air') out = 'minecraft:air';
+  else out = _fmtSt(name, props);
+  if (out === _fmtSt(..._parseSt(st))) out = st;     // unchanged: keep the exact original string
+  if (_verCache.size > 20000) _verCache.clear();
+  _verCache.set(ck, out);
+  return out;
+}
+
+// which block types of a palette change for this version: [[from, to, count]] (to '' = removed)
+function verReport(palette, data, ver) {
+  if (verRank(ver) >= 4) return [];
+  const per = new Map();
+  if (data) { const cnt = new Uint32Array(palette.length); for (const id of data) cnt[id]++; palette.forEach((s, i) => { if (cnt[i]) per.set(s, (per.get(s) || 0) + cnt[i]); }); }
+  else for (const s of palette) per.set(s, (per.get(s) || 0) + 1);
+  const agg = new Map();
+  for (const [s, n] of per) {
+    const to = verState(s, ver); if (to === s) continue;
+    const a = _parseSt(s)[0], b = to === 'minecraft:air' ? '' : _parseSt(to)[0];
+    const k = a + '>' + b; agg.set(k, (agg.get(k) || 0) + n);
+  }
+  return [...agg].map(([k, n]) => { const [a, b] = k.split('>'); return [a, b, n]; }).sort((x, y) => y[2] - x[2]);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2345,9 +2459,11 @@ function placeProp(W, prop, x, y, z, q = 0, opts = {}) {
 // ---- placement checks: things that break or change once pasted into the game -------------------
 const SOIL = /(grass_block|dirt|podzol|coarse_dirt|rooted_dirt|farmland|moss_block|mud\b|mycelium)/;
 const GRAVITY = /^minecraft:(sand|red_sand|gravel|suspicious_\w+|\w+_concrete_powder|anvil|chipped_anvil|damaged_anvil|scaffolding|pointed_dripstone)\b/;
-const PLANT = /^minecraft:(short_grass|tall_grass|fern|large_fern|poppy|dandelion|cornflower|\w+_tulip|allium|azure_bluet|oxeye_daisy|lily_of_the_valley|blue_orchid|rose_bush|lilac|peony|sunflower|\w+_sapling|sweet_berry_bush|wildflowers|pink_petals)\b/;
+const PLANT = /^minecraft:(short_grass|tall_grass|fern|large_fern|poppy|dandelion|cornflower|\w+_tulip|allium|azure_bluet|oxeye_daisy|lily_of_the_valley|blue_orchid|rose_bush|lilac|peony|sunflower|\w+_sapling|sweet_berry_bush|wildflowers|pink_petals|bush|firefly_bush)\b/;
+const DRY_PLANT = /^minecraft:(short_dry_grass|tall_dry_grass|dead_bush)\b/, DRY_SOIL = /(sand|terracotta|dirt|podzol|mud\b|grass_block|moss_block)/;
+const TALL_PLANT = /^minecraft:(tall_grass|large_fern|rose_bush|lilac|peony|sunflower|pitcher_plant|small_dripleaf)\[/;
 function checkPlacement(S, only) {
-  const issues = { leaves: 0, lantern: 0, plant: 0, gravity: 0, water: 0, door: 0 }, where = {};
+  const issues = { leaves: 0, lantern: 0, plant: 0, gravity: 0, water: 0, door: 0, tall: 0 }, where = {};
   const note = (k, key) => { issues[k]++; (where[k] = where[k] || []).length < 5 && where[k].push(key); };
   const get = (x, y, z) => S.blocks.get(key3(x, y, z));
   const keys = only ? [...only] : [...S.blocks.keys()];
@@ -2357,12 +2473,369 @@ function checkPlacement(S, only) {
     if (st.includes('_leaves[') && st.includes('persistent=false')) note('leaves', k);
     if (/lantern\[/.test(st)) { if (st.includes('hanging=true') ? isAir(above) : isAir(below)) note('lantern', k); }
     if (PLANT.test(st) && !st.includes(':potted_') && !(below && SOIL.test(below)) && !(st.includes('half=upper'))) note('plant', k);
+    if (DRY_PLANT.test(st) && !(below && DRY_SOIL.test(below))) note('plant', k);
+    if (TALL_PLANT.test(st)) { const up = st.includes('half=lower'), o = get(x, y + (up ? 1 : -1), z); if (!o || o.split('[')[0] !== st.split('[')[0] || o.includes(up ? 'half=lower' : 'half=upper')) note('tall', k); }
     if (GRAVITY.test(st) && (isAir(below) || isWater(below))) note('gravity', k);
     if (isWater(st)) for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0]]) if (isAir(get(x + dx, y + dy, z + dz))) { note('water', k); break; }
     if (/_door\[/.test(st)) { const up = st.includes('half=lower'); const o = get(x, y + (up ? 1 : -1), z); if (!o || !/_door\[/.test(o)) note('door', k); }
   }
   const total = Object.values(issues).reduce((a, b) => a + b, 0);
   return { total, issues, where };
+}
+
+// ---- greenery (绿化): recipes of ground, cover, flowers, shrubs and trees mixed by weight ----------
+// A recipe says WHAT grows; a density field (0..1 per cell) says HOW MUCH. Everything is decided per cell from a
+// fixed hash of (seed, x, z, layer), never from a running random sequence, so painting in one place never moves a
+// plant anywhere else: shrubs and trees use "hash-priority" Poisson-disk sampling (a candidate stays only if no
+// candidate with a higher priority lies within its spacing), which only looks at nearby cells.
+// Generation uses the newest block names; the target game version swaps them on show / export (version.js).
+
+const GREEN_GROUND = { grass_block: '草方块', podzol: '灰化土', moss_block: '苔藓块', coarse_dirt: '砂土', rooted_dirt: '缠根泥土', dirt: '泥土', mud: '泥巴', dirt_path: '土径（不长植物）' };
+const GREEN_COVER = { short_grass: '短草', tall_grass: '高草（两格）', fern: '蕨', large_fern: '大型蕨（两格）', bush: '灌木丛（1.21.5）', short_dry_grass: '短干草（1.21.5）', tall_dry_grass: '高干草（1.21.5）', dead_bush: '枯萎的灌木', leaf_litter: '落叶（1.21.5）', moss_carpet: '苔藓地毯', pink_petals: '粉红色花簇', wildflowers: '野花簇（1.21.5）' };
+const GREEN_FLOWERS = { poppy: '虞美人', dandelion: '蒲公英', cornflower: '矢车菊', oxeye_daisy: '滨菊', azure_bluet: '蓝花美耳草', allium: '绒球葱', lily_of_the_valley: '铃兰', blue_orchid: '兰花', red_tulip: '红色郁金香', orange_tulip: '橙色郁金香', white_tulip: '白色郁金香', pink_tulip: '粉红色郁金香', torchflower: '火把花', rose_bush: '玫瑰丛（两格）', lilac: '丁香（两格）', peony: '牡丹（两格）', sunflower: '向日葵（两格）' };
+const GREEN_SHRUBS = { 'leaf:oak': '橡树叶灌木', 'leaf:birch': '白桦叶灌木', 'leaf:spruce': '云杉叶灌木', 'leaf:dark_oak': '深色橡树叶灌木', 'leaf:azalea': '杜鹃叶灌木', 'leaf:flowering_azalea': '开花杜鹃叶灌木', 'leaf:cherry': '樱花叶灌木', azalea: '杜鹃花丛', flowering_azalea: '盛开的杜鹃花丛', sweet_berry_bush: '甜浆果丛', firefly_bush: '萤火虫灌木（1.21.5）' };
+const GREEN_TREES = { 'oak:m': '橡树', 'oak:l': '大橡树', 'birch:m': '白桦', 'birch:l': '高大白桦', 'spruce:m': '云杉', 'spruce:l': '巨型云杉', 'dark_oak:m': '深色橡树', 'cherry:m': '樱花树' };
+const GREEN_EDGES = { none: '无', hedge: '树篱（叶子围一圈）', border: '镶边（地面换一圈方块）' };
+const GREEN_BORDERS = { stone_bricks: '石砖', mossy_stone_bricks: '苔石砖', cobblestone: '圆石', mossy_cobblestone: '苔石', coarse_dirt: '砂土', dirt_path: '土径', packed_mud: '泥坯', bricks: '红砖' };
+const GREEN_SHRUB_SIZES = { s: '小（1 格）', m: '中（十字，高 2）', l: '大（3×3，高 2–3）', mix: '大小混合' };
+const GREEN_PREVIEWS = { uniform: '均匀（按浓度）', gradient: '渐变（左淡右浓）', round: '圆形（中间浓、边上淡）' };
+const TALL_GREEN = new Set(['tall_grass', 'large_fern', 'rose_bush', 'lilac', 'peony', 'sunflower']);
+const NO_PLANTS_ON = new Set(['dirt_path', 'stone_bricks', 'mossy_stone_bricks', 'cobblestone', 'mossy_cobblestone', 'bricks', 'packed_mud']);
+
+// the recipe a panel / swatch describes; missing parts get these values
+const GREEN_RECIPE_DEFAULT = {
+  ground: [['grass_block', 100]], ground_patch: 5,
+  cover: { amount: 50, items: [['short_grass', 70], ['tall_grass', 20], ['fern', 10]] },
+  flowers: { amount: 12, clump: 0.5, items: [['poppy', 1], ['dandelion', 1], ['oxeye_daisy', 1]] },
+  shrubs: { amount: 0, spacing: 3, size: 'mix', items: [['leaf:oak', 1]] },
+  trees: { amount: 0, spacing: 6, items: [['oak:m', 1]] },
+  from: { flowers: 20, shrubs: 40, trees: 50 },
+  edge: { kind: 'none', block: 'oak_leaves', border: 'stone_bricks', height: 2 },
+};
+
+// built-in swatches (绿化颜色). Each is a full recipe; the panel starts from one of them.
+const GREEN_SWATCHES = {
+  lawn: { name: '草坪', recipe: { ground: [['grass_block', 100]], ground_patch: 0, cover: { amount: 22, items: [['short_grass', 1]] }, flowers: { amount: 0, clump: 0, items: [['dandelion', 1]] } } },
+  meadow: { name: '野花草甸', recipe: { cover: { amount: 55, items: [['short_grass', 60], ['tall_grass', 22], ['fern', 6], ['wildflowers', 12]] },
+    flowers: { amount: 18, clump: 0.6, items: [['poppy', 3], ['dandelion', 3], ['cornflower', 2], ['oxeye_daisy', 2], ['azure_bluet', 2], ['allium', 1], ['lilac', 0.5], ['peony', 0.5]] } } },
+  cherry_grove: { name: '樱花林下', recipe: { cover: { amount: 45, items: [['short_grass', 50], ['pink_petals', 40], ['tall_grass', 10]] },
+    flowers: { amount: 4, clump: 0.5, items: [['allium', 1], ['pink_tulip', 1], ['lilac', 0.5]] }, trees: { amount: 0.7, spacing: 6, items: [['cherry:m', 1]] }, from: { flowers: 20, shrubs: 40, trees: 45 } } },
+  oak_wood: { name: '橡树林', recipe: { ground: [['grass_block', 70], ['podzol', 15], ['coarse_dirt', 8], ['moss_block', 7]], ground_patch: 6,
+    cover: { amount: 45, items: [['short_grass', 45], ['fern', 15], ['tall_grass', 10], ['leaf_litter', 20], ['bush', 10]] },
+    flowers: { amount: 3, clump: 0.7, items: [['lily_of_the_valley', 1], ['oxeye_daisy', 1]] },
+    shrubs: { amount: 1.5, spacing: 3, size: 'mix', items: [['leaf:oak', 3], ['leaf:azalea', 1]] },
+    trees: { amount: 1, spacing: 5, items: [['oak:m', 60], ['oak:l', 15], ['birch:m', 25]] }, from: { flowers: 20, shrubs: 35, trees: 45 } } },
+  spruce_wood: { name: '云杉林', recipe: { ground: [['podzol', 50], ['grass_block', 30], ['coarse_dirt', 12], ['moss_block', 8]], ground_patch: 6,
+    cover: { amount: 40, items: [['fern', 45], ['large_fern', 15], ['short_grass', 30], ['sweet_berry_bush', 0], ['leaf_litter', 10]] },
+    flowers: { amount: 0, clump: 0.5, items: [['lily_of_the_valley', 1]] }, shrubs: { amount: 1.2, spacing: 3, size: 'm', items: [['sweet_berry_bush', 1], ['leaf:spruce', 2]] },
+    trees: { amount: 1.6, spacing: 4, items: [['spruce:m', 85], ['spruce:l', 15]] }, from: { flowers: 20, shrubs: 35, trees: 45 } } },
+  thicket: { name: '灌木丛', recipe: { cover: { amount: 50, items: [['tall_grass', 40], ['short_grass', 40], ['bush', 20]] }, flowers: { amount: 4, clump: 0.5, items: [['poppy', 1], ['azure_bluet', 1]] },
+    shrubs: { amount: 6, spacing: 2, size: 'mix', items: [['leaf:oak', 3], ['leaf:birch', 1], ['leaf:azalea', 1], ['flowering_azalea', 1]] }, from: { flowers: 20, shrubs: 25, trees: 50 } } },
+  avenue: { name: '行道树（配合沿线笔刷）', recipe: { ground_patch: 0, cover: { amount: 20, items: [['short_grass', 1]] }, flowers: { amount: 0, clump: 0, items: [['dandelion', 1]] },
+    trees: { amount: 19, spacing: 1, items: [['oak:m', 3], ['birch:m', 1]] }, from: { flowers: 20, shrubs: 40, trees: 50 } } },
+  hedge: { name: '树篱', recipe: { ground_patch: 0, cover: { amount: 18, items: [['short_grass', 1]] }, flowers: { amount: 0, clump: 0, items: [['dandelion', 1]] },
+    edge: { kind: 'hedge', block: 'oak_leaves', border: 'stone_bricks', height: 2 } } },
+  flower_bed: { name: '花坛', recipe: { ground: [['grass_block', 60], ['rooted_dirt', 40]], ground_patch: 3, cover: { amount: 10, items: [['short_grass', 1]] },
+    flowers: { amount: 72, clump: 0.6, items: [['red_tulip', 2], ['orange_tulip', 2], ['white_tulip', 2], ['pink_tulip', 2], ['allium', 1], ['cornflower', 1], ['peony', 0.5], ['rose_bush', 0.5]] },
+    from: { flowers: 0, shrubs: 40, trees: 50 }, edge: { kind: 'border', block: 'oak_leaves', border: 'stone_bricks', height: 1 } } },
+  churchyard: { name: '墓园草地', recipe: { ground: [['grass_block', 85], ['moss_block', 10], ['coarse_dirt', 5]], ground_patch: 4, cover: { amount: 40, items: [['short_grass', 75], ['fern', 10], ['moss_carpet', 15]] },
+    flowers: { amount: 4, clump: 0.6, items: [['lily_of_the_valley', 2], ['azure_bluet', 1], ['oxeye_daisy', 1]] }, trees: { amount: 0.3, spacing: 8, items: [['dark_oak:m', 1], ['spruce:m', 1]] }, from: { flowers: 20, shrubs: 40, trees: 60 } } },
+  wetland: { name: '水边湿地', recipe: { ground: [['grass_block', 50], ['mud', 30], ['moss_block', 20]], ground_patch: 4, cover: { amount: 60, items: [['tall_grass', 35], ['short_grass', 30], ['fern', 15], ['large_fern', 10], ['moss_carpet', 10]] },
+    flowers: { amount: 6, clump: 0.7, items: [['blue_orchid', 3], ['azure_bluet', 1]] }, shrubs: { amount: 3, spacing: 3, size: 's', items: [['firefly_bush', 2], ['leaf:dark_oak', 1]] }, from: { flowers: 20, shrubs: 30, trees: 50 } } },
+};
+
+// fill in and clamp a recipe; unknown names are dropped (reported in `adjust` by the caller when it matters)
+function greenRecipe(r) {
+  const D = GREEN_RECIPE_DEFAULT, src = r || {}, num = (v, d, a, b) => { v = +v; if (!isFinite(v)) v = d; return Math.max(a, Math.min(b, v)); };
+  const items = (list, known, d) => { const out = (Array.isArray(list) ? list : d).filter(e => Array.isArray(e) && known[e[0]] && +e[1] > 0).map(e => [e[0], +e[1]]); return out; };
+  const L = (k, known, extra) => { const s = { ...D[k], ...(src[k] || {}) }; return { ...s, amount: num(s.amount, D[k].amount, 0, k === 'shrubs' || k === 'trees' ? 50 : 100), items: items(s.items, known, D[k].items), ...extra(s) }; };
+  return {
+    ground: (() => { const g = items(src.ground, GREEN_GROUND, D.ground); return g.length ? g : [['grass_block', 100]]; })(),
+    ground_patch: num(src.ground_patch ?? D.ground_patch, D.ground_patch, 0, 24),
+    cover: L('cover', GREEN_COVER, () => ({})),
+    flowers: L('flowers', GREEN_FLOWERS, s => ({ clump: num(s.clump, 0.5, 0, 1) })),
+    shrubs: L('shrubs', GREEN_SHRUBS, s => ({ spacing: num(s.spacing, 3, 1, 12), size: GREEN_SHRUB_SIZES[s.size] ? s.size : 'mix' })),
+    trees: L('trees', GREEN_TREES, s => ({ spacing: num(s.spacing, 6, 1, 20) })),
+    from: { flowers: num((src.from || {}).flowers ?? D.from.flowers, 20, 0, 100), shrubs: num((src.from || {}).shrubs ?? D.from.shrubs, 40, 0, 100), trees: num((src.from || {}).trees ?? D.from.trees, 50, 0, 100) },
+    edge: (() => { const e = { ...D.edge, ...(src.edge || {}) }; return { kind: GREEN_EDGES[e.kind] ? e.kind : 'none', block: /^[a-z_]+_leaves$/.test(e.block) ? e.block : 'oak_leaves', border: GREEN_BORDERS[e.border] ? e.border : 'stone_bricks', height: num(e.height, 2, 1, 4) | 0 }; })(),
+  };
+}
+const greenSwatchRecipe = k => greenRecipe({ ...(GREEN_SWATCHES[k] || GREEN_SWATCHES.meadow).recipe });
+
+// ---- fast deterministic hashing / noise (per cell, order independent) ----
+function ghash(seed, x, z, salt) {
+  let h = (seed | 0) ^ Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(z | 0, 0x165667b1) ^ Math.imul(salt | 0, 0x9e3779b1);
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b); h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35); h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+const GSALT = { ground: 11, gpick: 12, cover: 21, cpick: 22, camt: 23, flower: 31, fpick: 32, fclump: 33, fsp: 34, shrub: 41, spri: 42, spick: 43, ssize: 44, tree: 51, tpri: 52, tpick: 53, tseed: 54, face: 61 };
+function gnoise(seed, x, z, scale, salt) {                     // smooth value noise in 0..1
+  if (scale <= 0) return ghash(seed, x, z, salt);
+  const fx = x / scale, fz = z / scale, x0 = Math.floor(fx), z0 = Math.floor(fz), tx = fx - x0, tz = fz - z0;
+  const s = t => t * t * (3 - 2 * t), a = ghash(seed, x0, z0, salt), b = ghash(seed, x0 + 1, z0, salt), c = ghash(seed, x0, z0 + 1, salt), d = ghash(seed, x0 + 1, z0 + 1, salt);
+  const u = s(tx), v = s(tz); return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+}
+const ramp = (d, from) => { const t = from / 100; return d <= t ? (t === 0 && d > 0 ? d : 0) : t >= 1 ? 1 : (d - t) / (1 - t); };
+function gpick(list, u) { let t = 0; for (const [, w] of list) t += w; let r = u * t; for (const [n, w] of list) { r -= w; if (r < 0) return n; } return list[list.length - 1][0]; }
+
+// cached tree shapes: a few seeds per species / size so a forest does not rebuild every tree
+const _greenTreeCache = new Map();
+function greenTree(id, seed) {
+  const [sp, sz] = id.split(':'), k = id + ':' + seed;
+  if (!_greenTreeCache.has(k)) { if (_greenTreeCache.size > 64) _greenTreeCache.clear(); _greenTreeCache.set(k, tree({ species: sp, size: sz === 'l' ? 'l' : 'm', seed }).S.blocks); }
+  return _greenTreeCache.get(k);
+}
+// extent of a tree's canopy (cells from the trunk) — used to keep trees off houses and roads
+function greenTreeReach(blocks) { let r = 0; for (const k of blocks.keys()) { const [x, , z] = unkey(k); r = Math.max(r, Math.abs(x), Math.abs(z)); } return r; }
+
+// shrub shapes (relative cells [dx, dy, dz]) for the leaf bushes
+function shrubCells(size, u) {
+  if (size === 's') return [[0, 0, 0]];
+  if (size === 'm') return [[0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0]];
+  const out = [];
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const corner = dx && dz; if (corner && ghash(7, dx, dz, (u * 1e6) | 0) < 0.5) continue; out.push([dx, 0, dz]); }
+  out.push([0, 1, 0], [1, 1, 0], [-1, 1, 0], [0, 1, 1], [0, 1, -1]); if (u > 0.5) out.push([0, 2, 0]);
+  return out;
+}
+const shrubReach = size => size === 's' ? 0 : 1;
+
+// ---- the core: write one recipe over a density field --------------------------------------------
+// o: { x0, z0, x1, z1           cells to write (inclusive)
+//      dens(x, z) -> 0..1       density (may be called outside the box, for neighbours)
+//      top(x, z) -> y           the ground block's y at this cell (null = no ground: skip)
+//      can(x, y, z) -> bool     may this block be written (free air / not a house, road …)
+//      ground(x, z, y, st)      write the ground block
+//      set(x, y, z, st)         write a block above ground
+//      seed }
+// returns counts per layer
+function greenPaint(recipe, o) {
+  const R = greenRecipe(recipe), seed = (o.seed | 0) || 1, cnt = { ground: 0, cover: 0, flowers: 0, shrubs: 0, trees: 0, edge: 0 };
+  const dens = (x, z) => { const v = o.dens(x, z); return v > 0 ? Math.min(1, v) : 0; };
+  const edgeAt = (x, z) => dens(x, z) > 0 && (dens(x + 1, z) <= 0 || dens(x - 1, z) <= 0 || dens(x, z + 1) <= 0 || dens(x, z - 1) <= 0);
+  const B2 = (n, p) => B(n, p);
+  const face = (x, z) => ['north', 'east', 'south', 'west'][(ghash(seed, x, z, GSALT.face) * 4) | 0];
+  const occ = new Set(), K = (x, z) => x + ',' + z;            // cells taken by a tree trunk / shrub / hedge (no plant there)
+  const groundOf = new Map(), mine = o.mine || new Set(), clip = o.clip || [o.x0, o.z0, o.x1, o.z1];
+  const inClip = (x, z) => x >= clip[0] && x <= clip[2] && z >= clip[1] && z <= clip[3];
+  // greenery may overlap itself (canopies touch) but never anything else
+  const blocked = (x, y, z) => !mine.has(key3(x, y, z)) && !o.can(x, y, z);
+  const empty = (x, y, z) => !mine.has(key3(x, y, z)) && o.can(x, y, z);
+  const put = (x, y, z, st, over) => { const k = key3(x, y, z); if (mine.has(k) ? !over : !o.can(x, y, z)) return; mine.add(k); if (inClip(x, z)) o.set(x, y, z, st); };
+  // 1. ground + edge (only inside the clip box; trees and shrubs are decided over the whole box so that the
+  //    parts of a tree standing just outside the clip come out exactly as before)
+  for (let x = clip[0]; x <= clip[2]; x++) for (let z = clip[1]; z <= clip[3]; z++) {
+    const d = dens(x, z); if (d <= 0) continue; const y = o.top(x, z); if (y == null) continue;
+    let g = null;
+    if (R.edge.kind === 'border' && edgeAt(x, z)) { g = R.edge.border; cnt.edge++; }
+    else if (ghash(seed, x, z, GSALT.ground) < Math.min(1, d * 2)) g = gpick(R.ground, R.ground_patch > 0 ? Math.min(0.9999, gnoise(seed, x, z, R.ground_patch, GSALT.gpick) * 0.85 + ghash(seed, x, z, GSALT.gpick) * 0.15) : ghash(seed, x, z, GSALT.gpick));
+    if (g) { o.ground(x, z, y, B2(g, /^(grass_block|podzol|mycelium)$/.test(g) ? { snowy: false } : null)); groundOf.set(K(x, z), g); cnt.ground++; }
+    if (R.edge.kind === 'hedge' && edgeAt(x, z)) {
+      for (let h = 1; h <= R.edge.height; h++) put(x, y + h, z, LEAF(R.edge.block));
+      occ.add(K(x, z)); cnt.edge++;
+    }
+  }
+  const groundPick = (x, z) => {                               // the ground this recipe puts on a cell (same rule as above)
+    const d = dens(x, z); if (d <= 0) return null;
+    if (R.edge.kind === 'border' && edgeAt(x, z)) return R.edge.border;
+    return ghash(seed, x, z, GSALT.ground) < Math.min(1, d * 2) ? gpick(R.ground, R.ground_patch > 0 ? Math.min(0.9999, gnoise(seed, x, z, R.ground_patch, GSALT.gpick) * 0.85 + ghash(seed, x, z, GSALT.gpick) * 0.15) : ghash(seed, x, z, GSALT.gpick)) : null;
+  };
+  const soilOK = (x, z) => { const g = groundOf.has(K(x, z)) ? groundOf.get(K(x, z)) : groundPick(x, z); return !g || !NO_PLANTS_ON.has(g); };
+  // 2. trees and shrubs: hash-priority Poisson disk, only looks at cells within the spacing
+  const disk = (L, salt, pri, reachOf) => {
+    if (!L.amount || !L.items.length) return [];
+    const from = L === R.trees ? R.from.trees : R.from.shrubs, r = L.spacing, out = [];
+    // a candidate survives when no candidate of higher priority lies within r: with nd cells in the disk and
+    // candidate rate p, about (1 - e^(-p·nd)) / nd of the cells keep a plant. Solve for p so that the amount
+    // asked for (plants per 100 cells) is what comes out; it cannot exceed one plant per disk.
+    let nd = 0; for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) if ((dx || dz) && dx * dx + dz * dz <= r * r) nd++;
+    const pOf = t => { const x = Math.min(0.97, t * (nd + 1)); return x <= 0 ? 0 : Math.min(1, -Math.log(1 - x) / Math.max(1, nd)); };
+    const isCand = (x, z) => { const d = dens(x, z); if (d <= 0) return false; const p = pOf(L.amount / 100 * ramp(d, from)); return p > 0 && ghash(seed, x, z, salt) < p; };
+    const prio = (x, z) => ghash(seed, x, z, pri);
+    for (let x = o.x0; x <= o.x1; x++) for (let z = o.z0; z <= o.z1; z++) {
+      if (!isCand(x, z)) continue;
+      const p = prio(x, z); let ok = true;
+      for (let dx = -r; dx <= r && ok; dx++) for (let dz = -r; dz <= r; dz++) {
+        if ((dx || dz) && dx * dx + dz * dz <= r * r && isCand(x + dx, z + dz)) { const q = prio(x + dx, z + dz); if (q > p || (q === p && (dx > 0 || (dx === 0 && dz > 0)))) { ok = false; break; } }
+      }
+      if (ok) out.push([x, z]);
+    }
+    return out;
+  };
+  for (const [x, z] of disk(R.trees, GSALT.tree, GSALT.tpri)) {
+    const y = o.top(x, z); if (y == null || occ.has(K(x, z)) || (R.edge.kind === 'hedge' && edgeAt(x, z)) || !soilOK(x, z)) continue;
+    const id = gpick(R.trees.items, ghash(seed, x, z, GSALT.tpick)), bl = greenTree(id, 1 + ((ghash(seed, x, z, GSALT.tseed) * 6) | 0));
+    let fits = true;
+    // a tree may not touch anything built (o.hard); against hills and wild trees it just loses those leaves
+    const hard = o.hard || blocked;
+    for (const k of bl.keys()) { const [a, b, c] = unkey(k); if (!mine.has(key3(x + a, y + 1 + b, z + c)) && hard(x + a, y + 1 + b, z + c)) { fits = false; break; } }
+    if (!fits) continue;
+    for (const [k, st] of bl) { const [a, b, c] = unkey(k), log = /_(log|wood)\b/.test(st); put(x + a, y + 1 + b, z + c, st, log); if (b === 0 && log) occ.add(K(x + a, z + c)); }
+    occ.add(K(x, z)); cnt.trees++;
+  }
+  for (const [x, z] of disk(R.shrubs, GSALT.shrub, GSALT.spri)) {
+    const y = o.top(x, z); if (y == null || occ.has(K(x, z)) || (R.edge.kind === 'hedge' && edgeAt(x, z)) || !soilOK(x, z)) continue;
+    const id = gpick(R.shrubs.items, ghash(seed, x, z, GSALT.spick)), u = ghash(seed, x, z, GSALT.ssize);
+    if (id.startsWith('leaf:')) {
+      const size = R.shrubs.size === 'mix' ? (u < 0.35 ? 's' : u < 0.75 ? 'm' : 'l') : R.shrubs.size;
+      const cells = shrubCells(size, u).filter(([a, b, c]) => b > 0 || (dens(x + a, z + c) > 0 && o.top(x + a, z + c) === y && !occ.has(K(x + a, z + c))));
+      if (!cells.every(([a, b, c]) => b > 0 ? !blocked(x + a, y + 1 + b, z + c) : empty(x + a, y + 1, z + c))) continue;
+      for (const [a, b, c] of cells) { put(x + a, y + 1 + b, z + c, LEAF(id.slice(5) + '_leaves')); if (b === 0) occ.add(K(x + a, z + c)); }
+    } else {
+      if (!empty(x, y + 1, z)) continue;
+      put(x, y + 1, z, id === 'sweet_berry_bush' ? B('sweet_berry_bush', { age: 3 }) : B(id)); occ.add(K(x, z));
+    }
+    cnt.shrubs++;
+  }
+  // 3. flowers, then cover, one plant per cell
+  const F = R.flowers, C = R.cover;
+  for (let x = clip[0]; x <= clip[2]; x++) for (let z = clip[1]; z <= clip[3]; z++) {
+    const d = dens(x, z); if (d <= 0 || occ.has(K(x, z)) || !soilOK(x, z)) continue;
+    const y = o.top(x, z); if (y == null || !empty(x, y + 1, z)) continue;
+    let name = null, kind = null;
+    if (F.amount && F.items.length) {
+      const cl = F.clump, n = gnoise(seed, x, z, 4, GSALT.fclump), w = (1 - cl) + cl * Math.max(0, n * 2.2 - 0.6) / 0.53;   // clumps: same average amount, gathered into patches
+      if (ghash(seed, x, z, GSALT.flower) < F.amount / 100 * ramp(d, R.from.flowers) * w) {
+        const u = cl > 0 ? Math.min(0.9999, (1 - cl) * ghash(seed, x, z, GSALT.fsp) + cl * gnoise(seed, x, z, 5, GSALT.fpick)) : ghash(seed, x, z, GSALT.fsp);
+        name = gpick(F.items, u); kind = 'flowers';
+      }
+    }
+    if (!name && C.amount && C.items.length && ghash(seed, x, z, GSALT.cover) < C.amount / 100 * ramp(d, 0)) { name = gpick(C.items, ghash(seed, x, z, GSALT.cpick)); kind = 'cover'; }
+    if (!name) continue;
+    if (TALL_GREEN.has(name)) {
+      if (!empty(x, y + 2, z)) { if (kind === 'cover') { name = name === 'large_fern' ? 'fern' : 'short_grass'; } else continue; }
+      else { put(x, y + 1, z, B(name, { half: 'lower' })); put(x, y + 2, z, B(name, { half: 'upper' })); cnt[kind]++; continue; }
+    }
+    const amt = 1 + ((ghash(seed, x, z, GSALT.camt) * 4) | 0);
+    const st = name === 'pink_petals' || name === 'wildflowers' ? B(name, { facing: face(x, z), flower_amount: amt })
+      : name === 'leaf_litter' ? B(name, { facing: face(x, z), segment_amount: amt }) : B(name);
+    put(x, y + 1, z, st); cnt[kind]++;
+  }
+  return cnt;
+}
+// most plants per 100 cells a spacing allows (one per disk of that radius)
+function greenMaxAmount(spacing) { let nd = 0; for (let dx = -spacing; dx <= spacing; dx++) for (let dz = -spacing; dz <= spacing; dz++) if ((dx || dz) && dx * dx + dz * dz <= spacing * spacing) nd++; return Math.floor(97 / (nd + 1) * 10) / 10; }
+
+// ---- component: a rectangle of ground with one recipe (组件模式 → 绿化 → 绿化配方) ----
+const GREEN_DEFAULT = { swatch: 'meadow', width: 24, length: 24, preview: 'uniform', density: 100, seed: 1 };
+function greenPatch(o = {}) {
+  const sp = { ...GREEN_DEFAULT, ...o }, adjust = [];
+  sp.width = Math.max(4, Math.min(96, Math.round(+sp.width || 24))); sp.length = Math.max(4, Math.min(96, Math.round(+sp.length || 24)));
+  sp.density = Math.max(0, Math.min(100, +sp.density || 0)); if (!GREEN_PREVIEWS[sp.preview]) sp.preview = 'uniform';
+  const recipe = greenRecipe(o.recipe || (GREEN_SWATCHES[sp.swatch] || GREEN_SWATCHES.meadow).recipe);
+  for (const k of ['trees', 'shrubs']) { const L = recipe[k], mx = greenMaxAmount(L.spacing); if (L.amount > mx) { adjust.push({ key: k + '_amount', got: mx, why: `最小间距 ${L.spacing} 时每 100 格最多约 ${mx}` }); L.amount = mx; } }
+  const W = sp.width, L = sp.length, x0 = -(W >> 1), z0 = -(L >> 1), x1 = x0 + W - 1, z1 = z0 + L - 1, k = sp.density / 100;
+  const inside = (x, z) => x >= x0 && x <= x1 && z >= z0 && z <= z1;
+  const dens = (x, z) => {
+    if (!inside(x, z)) return 0;
+    if (sp.preview === 'gradient') return k * (x - x0 + 1) / W;
+    if (sp.preview === 'round') { const dx = (x - (x0 + x1) / 2) / (W / 2), dz = (z - (z0 + z1) / 2) / (L / 2), r = Math.sqrt(dx * dx + dz * dz); return k * Math.max(0, Math.min(1, (1.05 - r) / 0.6)); }
+    return k;
+  };
+  const S = new Structure();
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) S.set(x, -1, z, 'minecraft:grass_block[snowy=false]');
+  const cnt = greenPaint(recipe, { x0, z0, x1, z1, dens, seed: sp.seed, top: () => -1, can: (x, y, z) => !S.has(x, y, z),
+    ground: (x, z, y, st) => S.set(x, y, z, st), set: (x, y, z, st) => S.set(x, y, z, st) });
+  const report = [`绿化 ${W}×${L}：地面 ${cnt.ground} 格，地被 ${cnt.cover}，花 ${cnt.flowers}，灌木 ${cnt.shrubs}，树 ${cnt.trees}` + (cnt.edge ? `，边 ${cnt.edge} 格` : '')];
+  return { S, foot: [x0, z0, x1, z1], tags: ['green'], report, spec: { ...sp, recipe }, adjust, counts: cnt };
+}
+PROPS.green = { label: '绿化', make: greenPatch, styles: { ...Object.fromEntries(Object.entries(GREEN_SWATCHES).map(([k, v]) => [k, v.name])), custom: '自定义配方' } };
+
+// ---- greenery layers painted over a terrain / town (布局模式的绿化图层) --------------------------------
+// layer: { id, recipe, seed, visible, tiles: { 'tx,tz': Uint8Array(256) } }, density 0..255 per cell, 16×16 tiles.
+// The overlay is a Map key -> block kept apart from the town's own blocks; it is computed against those blocks
+// (never against itself), so any part of it can be recomputed alone and comes out the same.
+const GREEN_SOIL = /^minecraft:(grass_block|dirt|podzol|coarse_dirt|rooted_dirt|moss_block|mud|mycelium)(\[|$)/;
+const GREEN_SOFT = /^minecraft:(short_grass|grass|tall_grass|fern|large_fern|bush|short_dry_grass|tall_dry_grass|dead_bush|leaf_litter|moss_carpet|pink_petals|wildflowers|poppy|dandelion|cornflower|oxeye_daisy|azure_bluet|allium|lily_of_the_valley|blue_orchid|\w+_tulip|torchflower|rose_bush|lilac|peony|sunflower|snow)(\[|$)/;
+const GREEN_NATURAL = /^minecraft:(grass_block|dirt|coarse_dirt|podzol|rooted_dirt|stone|andesite|diorite|granite|deepslate|tuff|gravel|sand|red_sand|sandstone|clay|terracotta|\w+_terracotta|moss_block|mud|snow_block|calcite|water|dirt_path)(\[|$)/;
+const greenHard = st => !!st && !GREEN_SOFT.test(st) && !GREEN_NATURAL.test(st) && !(st.includes('_leaves[') && st.includes('persistent=false'));
+function greenDensOf(L) {
+  const T = L.tiles || {};
+  return (x, z) => { const t = T[(x >> 4) + ',' + (z >> 4)]; return t ? t[(x & 15) + ((z & 15) << 4)] / 255 : 0; };
+}
+function greenBounds(layers) {
+  let b = null;
+  for (const L of layers) for (const [k, t] of Object.entries(L.tiles || {})) {
+    if (!t || !t.some(v => v)) continue; const [tx, tz] = k.split(',').map(Number);
+    if (!b) b = [tx * 16, tz * 16, tx * 16 + 15, tz * 16 + 15]; else { b[0] = Math.min(b[0], tx * 16); b[1] = Math.min(b[1], tz * 16); b[2] = Math.max(b[2], tx * 16 + 15); b[3] = Math.max(b[3], tz * 16 + 15); }
+  }
+  return b;
+}
+// how far a change can reach: a tree's spacing decides which trunks stay, its canopy reaches out from the trunk
+function greenReach(layers) {
+  let reach = 2, spacing = 1;
+  for (const L of layers) {
+    const R = greenRecipe(L.recipe);
+    if (R.trees.amount && R.trees.items.length) { spacing = Math.max(spacing, R.trees.spacing); for (const [id] of R.trees.items) for (let s = 1; s <= 6; s++) reach = Math.max(reach, greenTreeReach(greenTree(id, s)) + 1); }
+    if (R.shrubs.amount && R.shrubs.items.length) spacing = Math.max(spacing, R.shrubs.spacing);
+  }
+  return { reach, spacing };
+}
+// recompute the overlay inside `rect` (null = everywhere). T = Terrain (ground heights) or a Structure.
+// returns { ov, clip, maxY }: clip = the box whose blocks may have changed
+function greenOverlay(T, layers, rect, ov) {
+  const S = T.S || T, vis = (layers || []).filter(L => L && L.visible !== false && L.tiles);
+  if (!rect || !ov) ov = new Map();
+  let maxY = -1;
+  const all = greenBounds(vis), bb = S.box || S.bounds();
+  if (!rect) { if (!all) return { ov, clip: null, maxY }; rect = all; }
+  const { reach, spacing } = greenReach(vis), m = spacing + 2 * reach + 1;
+  const clip = [Math.max(bb[0][0], rect[0] - m), Math.max(bb[0][2], rect[1] - m), Math.min(bb[1][0], rect[2] + m), Math.min(bb[1][2], rect[3] + m)];
+  if (clip[0] > clip[2] || clip[1] > clip[3]) return { ov, clip: null, maxY };
+  for (const k of [...ov.keys()]) { const i = k.indexOf(','), j = k.lastIndexOf(','), x = +k.slice(0, i), z = +k.slice(j + 1); if (x >= clip[0] && x <= clip[2] && z >= clip[1] && z <= clip[3]) ov.delete(k); }
+  if (!vis.length) return { ov, clip, maxY };
+  const dfs = vis.map(greenDensOf), own = new Map();
+  const owner = (x, z) => { const k = x + ',' + z; let o = own.get(k); if (o === undefined) { o = -1; for (let i = vis.length - 1; i >= 0; i--) if (dfs[i](x, z) > 0) { o = i; break; } own.set(k, o); } return o; };
+  const tops = new Map(), y0 = bb[0][1], y1 = bb[1][1];
+  const top = (x, z) => {
+    const k = x + ',' + z; if (tops.has(k)) return tops.get(k);
+    let y = null;
+    if (T.inside) { if (T.inside(x, z) && !T.water[T.idx(x, z)]) { const h = T.H(x, z), st = S.get(x, h, z); if (h >= y0 && st && GREEN_SOIL.test(st)) y = h; } }
+    else for (let yy = y1; yy >= y0; yy--) { const st = S.get(x, yy, z); if (!st || GREEN_SOFT.test(st)) continue; if (GREEN_SOIL.test(st)) y = yy; break; }
+    if (y != null) { const up = S.get(x, y + 1, z); if (up && !GREEN_SOFT.test(up)) y = null; }
+    tops.set(k, y); return y;
+  };
+  const can = (x, y, z) => { const st = S.get(x, y, z); return !st || GREEN_SOFT.test(st); }, hard = (x, y, z) => greenHard(S.get(x, y, z));
+  const mine = new Set(), lx0 = clip[0] - reach - spacing, lz0 = clip[1] - reach - spacing, lx1 = clip[2] + reach + spacing, lz1 = clip[3] + reach + spacing;
+  vis.forEach((L, i) => {
+    greenPaint(L.recipe, { x0: lx0, z0: lz0, x1: lx1, z1: lz1, clip, seed: L.seed || 1, mine, top, can, hard,
+      dens: (x, z) => owner(x, z) === i ? dfs[i](x, z) : 0,
+      ground: (x, z, y, st) => ov.set(key3(x, y, z), st),
+      set: (x, y, z, st) => ov.set(key3(x, y, z), st) });
+  });
+  for (const k of ov.keys()) { const y = +k.split(',')[1]; if (y > maxY) maxY = y; }
+  return { ov, clip, maxY };
+}
+// run fn with the overlay written into S, then put S back exactly as it was
+function greenWith(S, ov, fn) {
+  if (!ov || !ov.size) return fn();
+  const prev = [];
+  for (const [k, st] of ov) { prev.push([k, S.blocks.get(k)]); S.blocks.set(k, st); }
+  try { return fn(); } finally { for (const [k, st] of prev) { if (st === undefined) S.blocks.delete(k); else S.blocks.set(k, st); } }
+}
+
+// ---- automatic greenery for an automatic layout (自动布局 → 空地绿化) ----
+// Density grows with the distance from the nearest road: front gardens stay plain grass, the land behind the
+// houses fills in (with a forest recipe: lawn first, then shrubs, then trees). Houses, roads and squares are
+// skipped by the overlay itself. Depends only on the roads and the selection, so moving a house never changes it.
+function greenAuto(scene, zones) {
+  const out = [], roads = scene && scene.roadSet ? scene.roadSet : new Map();
+  for (const zn of zones || []) {
+    if (zn.kind !== 'district' || !zn.green || !zn.green.recipe) continue;
+    const M = zoneMask(zn); if (!M.count) continue;
+    const near = 7, ramp = 10, W = M.x1 - M.x0 + 1, L = M.z1 - M.z0 + 1, dist = new Float32Array(W * L).fill(Infinity), q = [];
+    for (const k of roads.keys()) { const [x, , z] = k.split(',').map(Number); if (x < M.x0 || x > M.x1 || z < M.z0 || z > M.z1) continue; const i = (x - M.x0) + (z - M.z0) * W; if (dist[i]) { dist[i] = 0; q.push(i); } }
+    for (let h = 0; h < q.length; h++) { const i = q[h], x = i % W, z = (i / W) | 0, d = dist[i] + 1;       // 4-neighbour distance (cells)
+      if (d > near + ramp) continue;
+      for (const [nx, nz] of [[x + 1, z], [x - 1, z], [x, z + 1], [x, z - 1]]) { if (nx < 0 || nz < 0 || nx >= W || nz >= L) continue; const j = nx + nz * W; if (dist[j] > d) { dist[j] = d; q.push(j); } } }
+    const tiles = {};
+    for (let z = 0; z < L; z++) for (let x = 0; x < W; x++) {
+      const wx = x + M.x0, wz = z + M.z0; if (!M.has(wx, wz)) continue;
+      const v = Math.max(0, Math.min(1, (dist[x + z * W] - near) / ramp)); if (!v) continue;
+      const tk = (wx >> 4) + ',' + (wz >> 4), t = tiles[tk] || (tiles[tk] = new Uint8Array(256)); t[(wx & 15) + ((wz & 15) << 4)] = Math.round(v * 255);
+    }
+    out.push({ id: 'auto' + zn.id, recipe: zn.green.recipe, seed: ((zn.seed || 1) * 131 + 7) | 0, visible: true, tiles });
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -3413,6 +3886,592 @@ function church(o = {}) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Gothic facades (精细立面). A face has its own frame: u across, v up (= y), d depth: 0 = the wall plane,
+// + outward, - inward. Every cell (u, v) has a front-surface depth D(u, v) and a role (frame / infill / niche /
+// door / glass / void). A cell is filled from its own depth back to the deepest of its neighbours (so recesses
+// get side walls), then edges are moulded automatically: the top edge of anything standing proud becomes a
+// sloped stair (weathering), the underside an upside-down stair (arch rims, cornices). Fixed parts go on last:
+// statues, pinnacles, crockets, finials. The same kit builds the west front and the towers' outer sides.
+// Layout follows the cathedral: the centre strip is the nave, the tower strips stand over the aisles, with a
+// buttress pier between them and one outside each tower. Storey heights come from the strip widths, so any
+// nave / aisle width gives a consistent front; parts that do not fit shrink (fewer arch orders) or drop.
+// gothicFrontLayout(...) runs first so the cathedral can raise its towers to the facade's tower top.
+// ---------------------------------------------------------------------------------------------
+function gothicArchIn(du, v, w, v0, hs) {           // inside a pointed (equilateral) arch: width w, springing at hs
+  const a = w / 2, x = Math.abs(du);
+  if (x > a - 0.5 || v < v0) return false;
+  if (v <= hs) return true;
+  return v + 0.5 <= hs + Math.sqrt(Math.max(0, w * w - (x + a) * (x + a))) + 0.35;
+}
+const gothicArchTop = (w, hs) => hs + Math.floor(Math.sqrt(3) * w / 2);
+// facade materials per wall style (frame, stairs, slab, wall post, statue head, capital, niche back)
+const GOTHIC_FACADE_MATS = {
+  white: { frame: 'polished_diorite', stairs: 'polished_diorite_stairs', slab: 'polished_diorite_slab', wall: 'diorite_wall', head: 'calcite', capital: 'chiseled_stone_bricks', niche: 'smooth_stone' },
+  stone: { frame: 'stone_bricks', stairs: 'stone_brick_stairs', slab: 'stone_brick_slab', wall: 'stone_brick_wall', head: 'polished_andesite', capital: 'chiseled_stone_bricks', niche: 'cracked_stone_bricks' },
+  rough: { frame: 'stone_bricks', stairs: 'stone_brick_stairs', slab: 'stone_brick_slab', wall: 'cobblestone_wall', head: 'polished_andesite', capital: 'chiseled_stone_bricks', niche: 'mossy_cobblestone' },
+  sandstone: { frame: 'smooth_sandstone', stairs: 'smooth_sandstone_stairs', slab: 'smooth_sandstone_slab', wall: 'sandstone_wall', head: 'chiseled_sandstone', capital: 'chiseled_sandstone', niche: 'sandstone' },
+  marble: { frame: 'quartz_block', stairs: 'quartz_stairs', slab: 'quartz_slab', wall: 'diorite_wall', head: 'calcite', capital: 'chiseled_quartz_block', niche: 'smooth_quartz' },
+  warm: { frame: 'cut_sandstone', stairs: 'sandstone_stairs', slab: 'cut_sandstone_slab', wall: 'sandstone_wall', head: 'chiseled_sandstone', capital: 'chiseled_sandstone', niche: 'smooth_sandstone' },
+  dark: { frame: 'polished_deepslate', stairs: 'polished_deepslate_stairs', slab: 'polished_deepslate_slab', wall: 'polished_deepslate_wall', head: 'deepslate_tiles', capital: 'chiseled_deepslate', niche: 'deepslate_tiles' },
+};
+function gothicFrontLayout({ hw, edge, NT, ridge, TT }) {
+  const cw = hw, b1 = hw + 1, b2 = edge + 1, t0 = hw + 4, t1 = edge, th = (t1 - t0) >> 1, tc = t0 + th, U = edge + 3;
+  const odd = n => n | 1;
+  const wc = odd(2 * cw - 1), oc = Math.max(1, Math.min(6, (wc - 5) >> 1)), hc = Math.max(5, Math.round(wc * 0.6));
+  const ws = odd(Math.max(5, 2 * th - 1)), os = Math.max(1, Math.min(4, (ws - 3) >> 1)), hsS = Math.max(4, Math.round(ws * 0.8));
+  const H_PORT = Math.max(gothicArchTop(wc, hc), gothicArchTop(ws, hsS)) - 2;
+  const H_GAL = H_PORT + 6, Rr = Math.max(2, cw - 2.4), vc = Math.round(H_GAL + Rr + 4), H_ROSE = Math.round(vc + Rr + 3);
+  const H_KING = H_ROSE + 9, gh = Math.round((cw + 0.5) * 1.35), gBase = Math.max(H_KING, ridge + 2 - gh);
+  const top = Math.max(TT, gBase + gh + 16, H_KING + 30);
+  return { cw, b1, b2, t0, t1, th, tc, U, wc, oc, hc, ws, os, hsS, H_PORT, H_GAL, Rr, vc, H_ROSE, H_KING, gh, gBase, top };
+}
+// the kit: one face. W(u, v, d) -> [x, y, z]; dir = world facings for inward / outward / -u / +u; ax = pane axis
+function gothicKit(S, o, W, dir, ax, mine) {
+  const FST = o.stairs;
+  const st = (m, f, half = 'bottom') => B(m, { facing: f, half, shape: 'straight', waterlogged: false });
+  const post = () => B(o.wall, { east: 'none', north: 'none', south: 'none', up: true, waterlogged: false, west: 'none' });
+  const rod = () => B('end_rod', { facing: 'up' });
+  const put = (u, v, d, s) => { const [x, y, z] = W(u, v, d); S.set(x, y, z, s); mine.add(x + ',' + y + ',' + z); };
+  const D = new Map(), R = new Map(), HOLE = new Map(), LOCK = new Set(), ATT = [];
+  const k2 = (u, v) => u + ',' + v;
+  const getD = (u, v) => D.get(k2(u, v));
+  const setD = (u, v, d, role, lock) => { const k = k2(u, v); if (LOCK.has(k) && !lock) return; D.set(k, d); R.set(k, role); if (lock) LOCK.add(k); };
+  const K = { st, post, rod, put, D, R, HOLE, ATT, k2, getD, setD, FST, dir, statues: 0, pins: 0 };
+  K.statue = (u, v, d) => { if (o.statues === false) return; put(u, v, d, post()); put(u, v + 1, d, post()); put(u, v + 2, d, B(o.head)); K.statues++; };
+  K.fill = () => {
+    for (const [k, d] of D) {
+      const [u, v] = k.split(',').map(Number), role = R.get(k), hole = HOLE.get(k);
+      if (hole === 'void') { for (let dd = Math.max(d, 1); dd >= -5; dd--) put(u, v, dd, 'minecraft:air'); continue; }   // open right through (also through the tower wall behind)
+      if (o.clear !== false) for (let dd = d + 1; dd <= d + 6; dd++) { const [x, y, z] = W(u, v, dd); if (S.has(x, y, z)) S.set(x, y, z, null); }   // clear what the building left in front of this cell (roof ends, old walls)
+      let back = Math.min(d - (o.thick ?? 2), o.backMax ?? -3);
+      for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = getD(u + a, v + b); if (n !== undefined && n < back) back = n; }
+      for (let dd = back; dd <= d; dd++) {
+        let s;
+        if (hole === 'glass') { if (dd === d) s = o.pane(...W(u, v, dd), ax); else if (dd === d - 1) s = B(o.dark || 'gray_concrete'); else continue; }   // pane, a dark block right behind it (reads as a window, stays joined)
+        else if (hole === 'door') s = dd === d ? B(o.door) : B(o.doorBack);
+        else s = role === 'infill' ? o.infill(...W(u, v, dd)) : role === 'niche' ? B(o.niche) : role === 'checker' ? B(((u + v) & 1) ? o.checkA || o.frame : o.checkB || o.niche) : B(o.frame);
+        put(u, v, dd, s);
+      }
+    }
+    for (const [k, d] of D) {                         // automatic mouldings
+      const [u, v] = k.split(',').map(Number); if (HOLE.has(k)) continue;
+      const up = getD(u, v + 1), dn = getD(u, v - 1);
+      if (up === undefined || up < d) { if (!HOLE.has(k2(u, v + 1))) put(u, v, d, st(FST, dir.in)); }
+      else if (v > 1 && dn !== undefined && dn < d && !HOLE.has(k2(u, v - 1))) put(u, v, d, st(FST, dir.in, 'top'));
+    }
+  };
+  K.courses = (rows, us, skip) => { for (const v of rows) for (const u of us) {   // string courses, open parapets on the listed rows
+    const d = getD(u, v); if (d === undefined || skip(u) || HOLE.has(k2(u, v))) continue;
+    put(u, v, d + 1, st(FST, dir.in, 'top'));
+    if (rows.parapet.includes(v)) put(u, v + 1, d + 1, Math.abs(u) % 2 ? post() : B(o.slab, { type: 'bottom', waterlogged: false }));
+  } };
+  K.pinnacle = (u, v, d, h, big) => {                // square shaft (pierced) -> corner pinnacles + stair cap -> needle with crockets -> finial
+    if (o.pinnacles === false) return;
+    // it must stand on something: under every cell of its foot, carry a stone column down to the nearest block (at most
+    // 6); a big one that cannot be carried becomes a small one; a small one that cannot is left out
+    const solidAt = (a, y, b) => { const t = S.get(...W(u + a, y, d + b)); return !!t && t !== 'minecraft:air' && !/_slab\[.*type=bottom/.test(t); };   // a bottom slab is only half a block: it leaves a gap
+    const footOk = rr => { for (let a = -rr; a <= rr; a++) for (let b = -rr; b <= rr; b++) { let y = v - 1, k = 0; while (k < 7 && !solidAt(a, y, b)) { y--; k++; } if (k >= 7) return false; } return true; };
+    if (big && !footOk(1)) big = false;
+    if (!big && !footOk(0)) return;
+    { const rr = big ? 1 : 0; for (let a = -rr; a <= rr; a++) for (let b = -rr; b <= rr; b++) for (let y = v - 1; !solidAt(a, y, b); y--) put(u + a, y, d + b, B(o.frame)); }
+    const r = big ? 1 : 0; K.pins++;
+    for (let y = 0; y < h; y++) for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++) {
+      const open = r && (!a !== !b) && y >= 1 && y <= h - 2 && h >= 4;
+      put(u + a, v + y, d + b, open ? 'minecraft:air' : B(o.frame));
+    }
+    let y = v + h;
+    const fac = (a, b) => b > 0 ? dir.in : b < 0 ? dir.out : a > 0 ? dir.un : dir.up;
+    if (r) {
+      for (const [a, b] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { put(u + a, y, d + b, post()); put(u + a, y + 1, d + b, rod()); }
+      for (const [a, b] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) put(u + a, y, d + b, st(FST, fac(a, b)));
+      put(u, y, d, B(o.frame)); y++;
+    }
+    const n = big ? 5 : 2;
+    for (let i = 0; i < n; i++) put(u, y + i, d, big && i === 0 ? B(o.frame) : post());
+    put(u, y + n, d, rod());
+  };
+  K.lancet = (uc, w, v0, hs, orders, base, vMax = Infinity, free = false) => {   // free: the gablet may rise above the wall (into the eaves)     // paired lancets under an oculus, splayed reveals, a gablet on top
+    const IN = gothicArchIn, AT = gothicArchTop;
+    for (let v = v0; v <= AT(w, hs) + 1; v++) for (let du = -(w >> 1); du <= w >> 1; du++) for (let k = 0; k <= orders; k++) if (IN(du, v, w - 2 * k, v0, hs)) setD(uc + du, v, base - 1 - k, 'frame');
+    const iw = w - 2 * orders, dIn = base - 1 - orders, ia = iw >> 1;
+    for (let v = v0; v <= AT(iw, hs); v++) for (let du = -ia; du <= ia; du++) {
+      if (!IN(du, v, iw, v0, hs)) continue;
+      const two = ia >= 2, sub = du < 0 ? -1 : 1, sd = du - sub * (ia + 1) / 2;
+      const inSub = two ? (ia >= 4 ? du !== 0 && IN(sd, v, ia, v0 + 1, hs - 3) : v >= v0 + 1 && (du !== 0 || v > hs + ia)) : v <= hs;   // with no room for an oculus: Y-tracery, one mullion that stops below the head
+      const rr = Math.hypot(du, v - (hs + 4)), oc = ia >= 4 && rr >= 1.6 && rr <= 3.2;   // an oculus only where a real ring fits (glass ring round a stone hub; smaller ones read as a cross)
+      if (inSub || oc) { setD(uc + du, v, dIn - 1, 'glass'); HOLE.set(k2(uc + du, v), 'glass'); }
+    }
+    const gb = AT(w, hs) - 1, a = w >> 1;
+    for (let v = gb; v <= Math.min(gb + a + 2, vMax); v++) for (let du = -a; du <= a; du++) if (v <= gb + a + 2 - Math.round(Math.abs(du) * (a + 2) / a) && (free || getD(uc + du, v) !== undefined) && !HOLE.has(k2(uc + du, v))) setD(uc + du, v, Math.max(getD(uc + du, v) ?? base + 1, base + 1), 'frame');
+    if (gb + a + 4 <= vMax) ATT.push(() => { put(uc, gb + a + 3, base + 1, post()); put(uc, gb + a + 4, base + 1, rod()); });
+  };
+  K.portal = (uc, w, hs, orders, base, isBut, vMax = Infinity) => {   // vMax: the gable and its finial stay below this row
+    const a = w >> 1, top = gothicArchTop(w, hs), gTop = Math.max(top + 1, Math.min(top + a + 6, vMax - 3));
+    for (let v = 0; v <= gTop; v++) for (let du = -a - 1; du <= a + 1; du++) {
+      const u = uc + du, au = Math.abs(du);
+      if (isBut(Math.abs(u), u)) continue;
+      const inGable = v >= hs && v <= gTop - Math.round(au * (gTop - hs) / (a + 1));
+      if (gothicArchIn(du, v, w + 2, 0, hs) || inGable) setD(u, v, base, 'frame', inGable && v > top);
+      for (let k = 0; k <= orders; k++) if (gothicArchIn(du, v, w - 2 * k, 0, hs)) setD(u, v, base - 1 - k, k === orders ? 'infill' : 'frame');
+    }
+    const iw = w - 2 * orders, ia = iw >> 1, dIn = base - 1 - orders;
+    for (let v = 1; v <= hs - 1; v++) for (let du = -ia + 1; du <= ia - 1; du++) {
+      if (du === 0 && ia >= 2) setD(uc, v, dIn + 1, 'frame'); else { setD(uc + du, v, dIn, 'door'); HOLE.set(k2(uc + du, v), 'door'); }
+    }
+    if (ia >= 2) { const tc2 = hs + Math.floor((gothicArchTop(iw, hs) - hs) / 2); for (let du = -2; du <= 2; du++) for (let dv = -2; dv <= 2; dv++) { const r = Math.hypot(du, dv); if ((r <= 2.3 && r > 1.2) || r < 0.5) setD(uc + du, tc2 + dv, dIn + 1, 'frame'); } }
+    ATT.push(() => {
+      for (let k = 0; k < orders; k++) for (const s of [-1, 1]) {      // jamb shafts with capitals
+        const u = uc + s * (((w - 2 * k) / 2 - 0.5) | 0), d = base - 1 - k;
+        for (let v = 1; v < hs - 1; v++) put(u, v, d, post());
+        put(u, hs - 1, d, B(o.capital)); if (k % 2 === 0 && hs > 6) put(u, 5, d, B(o.head));
+      }
+      for (let du = -a - 1; du <= a + 1; du++) {                        // crockets up the gable, finial on top
+        const au = Math.abs(du), v = gTop - Math.round(au * (gTop - hs) / (a + 1));
+        if (au % 2 === 1 && au <= a) put(uc + du, v + 1, base, st(FST, du < 0 ? dir.up : dir.un));
+      }
+      put(uc, gTop + 1, base, post()); put(uc, gTop + 2, base, post()); put(uc, gTop + 3, base, rod());
+    });
+    if (a >= 4 && top + 5 <= gTop) for (let du = -1; du <= 1; du++) for (let dv = -1; dv <= 1; dv++) if (Math.abs(du) + Math.abs(dv) <= 1) setD(uc + du, top + 3 + dv, base - 1, du || dv ? 'niche' : 'frame', true);
+  };
+  K.belfry = (uc, wb, ob, v0, hs, skip) => {         // tall open belfry lancet with reveals
+    const IN = gothicArchIn, AT = gothicArchTop, wo = wb + 2 * ob;
+    for (let v = v0; v <= AT(wo, hs); v++) for (let du = -(wo >> 1); du <= wo >> 1; du++) for (let k = 0; k <= ob; k++) if (IN(du, v, wo - 2 * k, v0, hs) && !skip(uc + du)) setD(uc + du, v, -1 - k, 'frame');
+    for (let v = v0 + 1; v <= AT(wb, hs); v++) for (let du = -(wb >> 1); du <= wb >> 1; du++) if (IN(du, v, wb, v0 + 1, hs) && (du !== 0 || wb < 5)) HOLE.set(k2(uc + du, v), 'void');
+  };
+  K.panels = (us, v0, v1, skip) => {               // blind tracery: narrow recessed upright strips on plain wall, a band every 9 rows
+    for (let v = v0; v <= v1; v++) for (const u of us) {
+      if (skip(u) || (v - v0) % 9 === 0 || ((u % 2) + 2) % 2) continue;
+      const k = k2(u, v), d = D.get(k);
+      if (d === undefined || R.get(k) !== 'infill' || HOLE.has(k) || getD(u - 1, v) !== d || getD(u + 1, v) !== d) continue;
+      setD(u, v, d - 1, 'niche');
+    }
+  };
+  K.kings = (v0, v1, us, base, skip) => {            // a row of statue niches
+    if (o.kings === false) return;
+    for (let v = v0 + 1; v <= v1 - 1; v++) for (const u of us) {
+      if (skip(u)) continue; const au = Math.abs(u);
+      if (v >= v0 + 2 && v <= v0 + 5 && au % 3 !== 0) { setD(u, v, base(u) - 1, 'niche'); if (au % 3 === 1 && v === v0 + 2) ATT.push(() => K.statue(u, v, base(u) - 1)); }
+      else if (v === v0 + 6 && au % 3 === 2) setD(u, v, base(u) - 1, 'niche');
+    }
+  };
+  return K;
+}
+const GOTHIC_FRONT_DIR = { in: 'east', out: 'west', un: 'north', up: 'south' };
+function gothicFront(S, L, o) {
+  const { cw, b1, b2, th, tc, U, H_PORT, H_GAL, H_ROSE, H_KING, gh, gBase, top: H_TOWER } = L;
+  const mine = new Set();
+  const K = gothicKit(S, o, (u, v, d) => [-d, v, u], GOTHIC_FRONT_DIR, 'z', mine);
+  const { st, post, rod, put, HOLE, ATT, k2, getD, setD, FST } = K;
+  const sym = f => { for (let u = -U; u <= U; u++) f(u, Math.abs(u)); };
+  const us = []; for (let u = -U; u <= U; u++) us.push(u);
+  const isBut = au => (au >= b1 && au <= b1 + 2) || (au >= b2 && au <= b2 + 2);
+  const butMid = [b1 + 1, b2 + 1];
+  const butD = v => v <= H_PORT ? 5 : v <= H_ROSE ? 4 : v < H_KING ? 3 : 2;
+  const inTower = au => au > cw;
+  const base0 = au => inTower(au) ? 0 : -1;
+  const AT = gothicArchTop, IN = gothicArchIn;
+
+  // 1. wall planes and buttress piers (each stage steps back one block)
+  for (let v = 0; v <= H_TOWER; v++) sym((u, au) => {
+    if (v >= H_KING && !inTower(au)) return;
+    if (isBut(au)) setD(u, v, butD(v), 'frame'); else setD(u, v, base0(au), 'infill');
+  });
+  // 2. portals: arch rim standing proud, orders stepping in, doors, a steep gable (locked so later storeys keep it)
+  const portal = (uc, w, hs, orders, base) => K.portal(uc, w, hs, orders, base, isBut, H_GAL);   // gables end under the gallery, clear of the rose
+  const capO = n => Math.max(1, Math.min(n, o.orders || 6));
+  portal(0, L.wc, L.hc, capO(L.oc), 2);
+  for (const s of [-1, 1]) portal(s * tc, L.ws, L.hsS, capO(L.os), 2);
+  // 3. blind arcade with statues over the portals
+  for (let v = H_PORT + 1; v <= H_GAL; v++) sym((u, au) => {
+    if (isBut(au) || getD(u, v) > 0) return;
+    const base = base0(au), m = (au + 1) % 4;
+    if (v >= H_PORT + 2 && v <= H_GAL - 1 && m !== 0 && (v < H_GAL - 1 || m === 2)) { setD(u, v, base - 1, 'niche'); if (m === 2 && v === H_PORT + 2) ATT.push(() => K.statue(u, v, base - 1)); }
+  });
+  // 4. rose storey: rose in a deep pointed frame between the towers; paired lancets with a gablet on each tower
+  {
+    const w = 2 * cw + 1, v0 = H_GAL + 1, Rr = L.Rr, Ri = Math.ceil(Rr) + 1;
+    const hs = o.rose === false ? Math.max(v0 + 5, H_ROSE - 1 - Math.floor(Math.sqrt(3) * (w - 4) / 2)) : L.vc - 2;   // without a rose the frame (and its window) fills the whole storey
+    for (let v = v0; v <= H_ROSE; v++) for (let du = -cw; du <= cw; du++) for (let k = 0; k < 3; k++) if (IN(du, v, w - 2 * k, v0, hs)) setD(du, v, -2 - k, k === 2 ? 'infill' : 'frame');
+    const spokes = Rr >= 5 ? 12 : Rr >= 3.5 ? 8 : 6;
+    if (o.rose === false) K.lancet(0, Math.min(2 * cw - 3, 11) | 1, v0 + 1, hs, 2, -2, H_ROSE);   // no rose: a tall traceried window instead
+    else for (let du = -Ri; du <= Ri; du++) for (let dv = -Ri; dv <= Ri; dv++) {
+      const r = Math.hypot(du, dv); if (r > Rr + 0.5) continue;
+      const ang = Math.atan2(dv, du), sp = Math.abs((((ang / (2 * Math.PI / spokes)) % 1) + 1) % 1 - 0.5);
+      const solid = r < 1.3 || (Rr >= 4 && r > Rr * 0.48 && r < Rr * 0.48 + 1) || r > Rr - 0.5 || (sp > 0.42 && r > 1.3);
+      if (solid) setD(du, L.vc + dv, -4, 'frame'); else { setD(du, L.vc + dv, -5, 'glass'); HOLE.set(k2(du, L.vc + dv), 'glass'); }
+    }
+  }
+  const wl = Math.max(3, Math.min(9, (2 * th - 1) | 1));
+  for (const s of [-1, 1]) K.lancet(s * tc, wl, H_GAL + 2, H_ROSE - 8, wl >= 7 ? 2 : 1, 0, H_ROSE);
+  // 5. gallery of kings
+  K.kings(H_ROSE, H_KING, us, u => base0(Math.abs(u)), u => isBut(Math.abs(u)));
+  // 6. above: a gable between the towers (high enough to hide the nave roof), belfry openings on the towers
+  for (let v = H_KING; v <= gBase + gh; v++) for (let u = -cw; u <= cw; u++) if (v <= gBase || v - gBase <= Math.round((cw + 0.5 - Math.abs(u)) * gh / (cw + 0.5))) setD(u, v, -1, 'infill');
+  for (let v = H_KING + 1; v <= gBase - 1; v++) for (let u = -cw + 1; u <= cw - 1; u++) if ((u + cw) % 3 !== 0 && v <= gBase - 2) setD(u, v, -2, 'niche');   // blind arcade under the gable
+  ATT.push(() => { for (let u = -cw; u <= cw; u++) if (Math.abs(u) % 2 === 1) { const v = gBase + Math.round((cw + 0.5 - Math.abs(u)) * gh / (cw + 0.5)); put(u, v + 1, -1, st(FST, u < 0 ? 'south' : 'north')); } });   // crockets up the gable
+  const gr = Math.max(1.5, Math.min(3.3, cw / 3)), gvc = gBase + Math.round(gh * 0.4);
+  for (let du = -5; du <= 5; du++) for (let dv = -5; dv <= 5; dv++) { const r = Math.hypot(du, dv); if (r <= gr + 1) { if (r > gr || r < 1) setD(du, gvc + dv, -2, 'frame'); else { setD(du, gvc + dv, -3, 'glass'); HOLE.set(k2(du, gvc + dv), 'glass'); } } }   // a glass ring round a stone hub (a small filled disc reads as a cross)
+  const bel = th >= 6 ? [tc - 3, tc + 3] : [tc];
+  const wb = th >= 6 ? 5 : Math.max(3, Math.min(5, (2 * th - 3) | 1)), ob = 2 * th + 1 - wb >= 4 ? 2 : 1;
+  for (const s of [-1, 1]) for (const uc of bel) K.belfry(s * uc, wb, ob, H_KING + 3, H_TOWER - 10, u => isBut(Math.abs(u)));
+  for (let v = H_KING + 1; v <= H_TOWER - 1; v++) for (const s of [-1, 1]) for (const au of [cw + 4, L.t1]) if (getD(s * au, v) === 0) setD(s * au, v, 1, 'frame');   // corner shafts
+  if (o.forest) K.panels(us, H_PORT + 2, H_TOWER - 2, u => isBut(Math.abs(u)));
+  // 7. fill, mouldings, string courses, fixed parts
+  K.fill();
+  const rows = [H_PORT + 1, H_GAL, H_ROSE + 1, H_KING - 1, H_TOWER]; rows.parapet = [H_GAL, H_KING - 1, H_TOWER];
+  K.courses(rows, us, u => isBut(Math.abs(u)));
+  for (const f of ATT) f();
+  // 8. pinnacles: on every buttress set-back, a big one on each buttress top, a cluster on each tower
+  sym((u, au) => {
+    if (!butMid.includes(au)) return;
+    for (const [v0, v1] of [[2, H_PORT - 2], [H_PORT + 3, H_ROSE - 3], [H_KING + 2, H_TOWER - 4]]) for (let v = v0 + 2; v + 4 < v1; v += 10) {
+      const d = butD(v); for (let y = v; y < v + 4; y++) put(u, y, d, 'minecraft:air'); K.statue(u, v, d - 1); put(u, v + 4, d, st(FST, 'east', 'top'));
+    }
+    for (const v of [H_PORT + 1, H_ROSE + 1, H_KING]) { const d = butD(v) + 1; if (getD(u, v - 1) === d) { K.pinnacle(u - Math.sign(u), v, d, 2, false); K.pinnacle(u + Math.sign(u), v, d, 2, false); } }
+    K.pinnacle(u, H_TOWER + 1, 0, 5, true);
+  });
+  if (o.towerTop !== 'openwork') for (const s of [-1, 1]) { K.pinnacle(s * tc, H_TOWER + 1, -3, Math.max(5, th + 3), true); if (th >= 4) { K.pinnacle(s * (tc - 3), H_TOWER + 1, -6, 4, false); K.pinnacle(s * (tc + 3), H_TOWER + 1, -6, 4, false); } }
+  put(0, gBase + gh + 1, -1, post()); put(0, gBase + gh + 2, -1, post()); put(0, gBase + gh + 3, -1, rod());
+  return { mine, statues: K.statues, pins: K.pins, width: 2 * U + 1 };
+}
+// a tower's outer side (north or south): the same storeys as the front, a buttress at the back corner,
+// a lancet in the rose storey, a band of niches, an open belfry. Face plane z = s * zf, u = world x.
+function gothicTowerSide(S, L, o, s, zf, x0, x1, mine) {
+  const { H_PORT, H_GAL, H_ROSE, H_KING, top: H_TOWER } = L;
+  const dir = s > 0 ? { in: 'north', out: 'south', un: 'west', up: 'east' } : { in: 'south', out: 'north', un: 'west', up: 'east' };
+  const K = gothicKit(S, o, (u, v, d) => [u, v, s * (zf + d)], dir, 'x', mine);
+  const { setD, getD, ATT } = K;
+  const bu0 = x1 - 2, isBut = u => u >= bu0, butD = v => v <= H_PORT ? 4 : v <= H_ROSE ? 3 : v < H_KING ? 2 : 1;
+  const us = []; for (let u = x0; u <= x1; u++) us.push(u);
+  for (let v = 0; v <= H_TOWER; v++) for (const u of us) setD(u, v, isBut(u) ? butD(v) : 0, isBut(u) ? 'frame' : 'infill');
+  const cu = (x0 + bu0 - 1) >> 1, room = bu0 - x0;            // centre and width of the plain part
+  for (let v = H_PORT + 2; v <= H_GAL - 1; v++) for (const u of us) if (!isBut(u) && (u - x0) % 4 !== 3 && (v < H_GAL - 1 || (u - x0) % 4 === 1)) { setD(u, v, -1, 'niche'); if ((u - x0) % 4 === 1 && v === H_PORT + 2) ATT.push(() => K.statue(u, v, -1)); }
+  const wl = Math.max(3, Math.min(7, (room - 2) | 1));
+  if (room >= 5) K.lancet(cu, wl, H_GAL + 2, H_ROSE - 8, wl >= 7 ? 2 : 1, 0, H_ROSE);
+  K.kings(H_ROSE, H_KING, us, () => 0, isBut);
+  const wb = Math.max(3, Math.min(5, (room - 4) | 1));
+  if (room >= 5) K.belfry(cu, wb, room - wb >= 4 ? 2 : 1, H_KING + 3, H_TOWER - 10, isBut);
+  if (o.forest) K.panels(us, H_GAL + 1, H_TOWER - 2, isBut);
+  K.fill();
+  const rows = [H_PORT + 1, H_GAL, H_ROSE + 1, H_KING - 1, H_TOWER]; rows.parapet = [H_GAL, H_KING - 1, H_TOWER];
+  K.courses(rows, us, isBut);
+  for (const f of ATT) f();
+  K.pinnacle(x1 - 1, H_TOWER + 1, 1, 5, true);
+  for (const v of [H_PORT + 1, H_ROSE + 1, H_KING]) { const d = butD(v) + 1; if (getD(x1 - 1, v - 1) === d) K.pinnacle(x1 - 1, v, d, 2, false); }
+  return { statues: K.statues, pins: K.pins };
+}
+// facade blocks left floating (not joined to the ground through faces) are removed and counted; should be 0
+function gothicDropFloating(S, mine) {
+  const seen = new Set(), q = [];
+  for (const k of S.blocks.keys()) if (k.split(',')[1] === '0') { seen.add(k); q.push(k); }
+  while (q.length) { const [x, y, z] = q.pop().split(',').map(Number); for (const [a, b, c] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) { const k = (x + a) + ',' + (y + b) + ',' + (z + c); if (!seen.has(k) && S.blocks.has(k)) { seen.add(k); q.push(k); } } }
+  let n = 0; for (const k of mine) if (S.blocks.has(k) && !seen.has(k)) { S.blocks.delete(k); n++; }
+  return n;
+}
+// an aisle's outer wall (north or south side of nave and choir): a plinth, a sill course, a pier with a set-back
+// on every bay line (where the flying buttresses stand), a lancet with reveals in every bay, a cornice and an
+// open parapet in front of the lean-to roof. Thin: only one block behind the wall plane is touched.
+function gothicSideWall(S, o, s, zf, x0, x1, bay, vTop, mine, vBase = 0) {   // vBase > 0: an upper wall (clerestory) standing on a roof
+  const dir = s > 0 ? { in: 'north', out: 'south', un: 'west', up: 'east' } : { in: 'south', out: 'north', un: 'west', up: 'east' };
+  const K = gothicKit(S, { ...o, thick: 2, backMax: -2 }, (u, v, d) => [u, v, s * (zf + d)], dir, 'x', mine);   // walls 3 thick: room for deep reveals
+  const { setD, ATT } = K;
+  const pier = u => ((u % bay) + bay) % bay === 0, shoulder = u => pier(u - 1) || pier(u + 1);
+  const us = []; for (let u = x0; u <= x1; u++) us.push(u);
+  const set = vBase ? -1 : vTop - 3, sill = vBase ? vBase + 3 : o.forest ? Math.max(3, Math.min(7, vTop - 9)) : 3;   // Cologne: windows start higher, a chequered dado below them
+  for (let v = vBase; v <= vTop; v++) for (const u of us) {
+    if (pier(u)) setD(u, v, v < set ? 2 : 1, 'frame');
+    else if (shoulder(u)) setD(u, v, v < set ? 1 : 0, 'frame');
+    else setD(u, v, !vBase && v <= 1 ? 1 : 0, !vBase && v <= 1 ? 'frame' : !vBase && o.forest && v >= 2 && v < sill - 1 ? 'checker' : 'infill');
+  }
+  const free = bay - 3, w = Math.max(1, Math.min(5, (free - 1) | 1)), ord = w >= 3 ? 1 : 0, hs = Math.max(vBase + 5, vTop - 4 - (w >> 1));
+  let nw = 0;
+  for (let xb = Math.ceil(x0 / bay) * bay - bay; xb <= x1; xb += bay) {
+    const xm = xb + (bay >> 1); if (xm - (w >> 1) - ord < x0 || xm + (w >> 1) + ord > x1) continue;
+    if (hs - vBase >= 5) { K.lancet(xm, w + 2 * ord, sill, hs, ord, 0, vBase || o.forest ? vTop + 6 : vTop - 1, !!vBase || !!o.forest); nw++; }   // a gablet (wimperg) over each window, up through the eaves (aisles too in the pinnacle-forest styles)   // clerestory: a gablet (wimperg) over each window, up through the eaves
+  }
+  if (o.forest && !vBase) K.panels(us, sill, vTop - 1, u => pier(u) || shoulder(u));
+  K.fill();
+  const rows = [vBase + 2, vTop]; rows.parapet = [vTop];
+  K.courses(rows, us, u => pier(u));
+  for (const f of ATT) f();
+  if (vBase) for (const u of us) if (pier(u)) K.pinnacle(u, vTop + 1, 1, 2, false);   // eaves pinnacles over the flyers' landings
+  if (o.forest) for (const u of us) if (shoulder(u) && us.includes(u)) K.pinnacle(u, vTop + 1, vBase ? 0 : 1, vBase ? 2 : 3, false);   // pinnacle forest: one more on each side of every pier
+  if (o.forest && !vBase) for (const u of us) if (pier(u)) K.pinnacle(u, vTop + 1, 2, 2, false);
+  return { windows: nw };
+}
+// a transept front (north or south end): corner piers, a portal with a gable, a band of statue niches, up to vTop
+function gothicTransept(S, o, s, zf, x0, x1, vTop, mine, wallTop = vTop, apex = 0) {
+  const dir = s > 0 ? { in: 'north', out: 'south', un: 'west', up: 'east' } : { in: 'south', out: 'north', un: 'west', up: 'east' };
+  const K = gothicKit(S, o, (u, v, d) => [u, v, s * (zf + d)], dir, 'x', mine);
+  const { setD } = K;
+  const isBut = (au, u) => u <= x0 + 1 || u >= x1 - 1;
+  const us = []; for (let u = x0; u <= x1; u++) us.push(u);
+  for (let v = 0; v <= wallTop; v++) for (const u of us) if (v <= vTop || isBut(0, u)) setD(u, v, isBut(0, u) ? (v < vTop - 6 ? 3 : v <= vTop ? 2 : 1) : 0, isBut(0, u) ? 'frame' : 'infill');
+  const xm = (x0 + x1) >> 1, room = x1 - x0 - 3, w = Math.max(5, Math.min(11, (room - 2) | 1)), ord = Math.max(1, Math.min(4, (w - 3) >> 1));
+  K.portal(xm, w, Math.round(w * 0.7), ord, 2, isBut);
+  const vb = gothicArchTop(w, Math.round(w * 0.7)) + (w >> 1) + 8;
+  if (o.bigWindow) {                                 // Cologne: no rose; one tall traceried window filling the front, a wimperg over it
+    const wl = Math.max(5, Math.min(13, (room - 2) | 1)), v0 = vb - 4, hs = (apex || wallTop) - 7 - Math.floor(Math.sqrt(3) * wl / 2);   // the window rises into the gable
+    if (hs - v0 >= 6) K.lancet(xm, wl, v0, hs, 2, 0, (apex || wallTop) - 2, true);
+  } else if (vb + 7 <= vTop) K.kings(vb, vb + 8, us, () => 0, u => isBut(0, u));
+  K.fill();
+  const rows = [vb, vTop]; rows.parapet = [];
+  K.courses(rows, us, u => isBut(0, u));
+  for (const f of K.ATT) f();
+  for (const u of [x0, x1]) { K.pinnacle(u + (u === x0 ? 1 : -1), vTop + 1, 3, 2, false); K.pinnacle(u + (u === x0 ? 1 : -1), wallTop + 1, 1, 4, true); }
+  if (apex) K.pinnacle(xm, apex + 1, 0, 3, false);   // a slim finial: the gable's peak is a single block wide
+  return { statues: K.statues };
+}
+// a single big pinnacle at world (x, y, z) (on flying-buttress piers, round the east end)
+function gothicPinnacleAt(S, o, x, y, z, h, big, mine) {
+  const K = gothicKit(S, o, (u, v, d) => [-d, v, u], GOTHIC_FRONT_DIR, 'z', mine);
+  K.pinnacle(z, y, -x, h, big);
+}
+// a short plain wall (transept east / west sides): plinth, sill course, cornice with an open parapet. Face plane x = xf.
+function gothicShortWall(S, o, sx, xf, z0, z1, vTop, mine) {
+  const dir = sx < 0 ? { in: 'east', out: 'west', un: 'north', up: 'south' } : { in: 'west', out: 'east', un: 'north', up: 'south' };
+  const K = gothicKit(S, { ...o, thick: 1, backMax: -1 }, (u, v, d) => [xf + sx * d, v, u], dir, 'z', mine);
+  const us = []; for (let u = Math.min(z0, z1); u <= Math.max(z0, z1); u++) us.push(u);
+  for (let v = 0; v <= vTop; v++) for (const u of us) K.setD(u, v, v <= 1 ? 1 : 0, v <= 1 ? 'frame' : 'infill');
+  K.fill();
+  const rows = [2, vTop]; rows.parapet = [vTop];
+  K.courses(rows, us, () => false);
+}
+// a flying buttress (single): a pier outside the aisle wall, 3 wide, stepping in twice, crowned by a pinnacle of the
+// pier's own width; an arch whose top is a straight sloping coping and whose underside is a curve, thick at the pier and
+// thin at the wall, landing on the clerestory pilaster. z0 = the aisle wall plane, zw = the clerestory face (+1).
+function gothicFlyer(S, o, s, xb, z0, yp, zw, yw, RH, mine, zMid = null) {   // zMid: an intermediate pier (between two aisles) carrying its own pinnacle
+  const put = (x, y, z, b) => { S.set(x, y, z, b); mine.add(x + ',' + y + ',' + z); };
+  const st = (m, f, h = 'bottom') => B(m, { facing: f, half: h, shape: 'straight', waterlogged: false });
+  const IN = s > 0 ? 'north' : 'south', OUT = s > 0 ? 'south' : 'north';
+  const y1 = Math.round(yp * 0.45), y2 = Math.round(yp * 0.75);
+  for (let y = 0; y <= yp; y++) for (let dx = -1; dx <= 1; dx++) {
+    const deep = y <= y1 ? 5 : y <= y2 ? 4 : 3;
+    for (let k = 1; k <= deep; k++) put(xb + dx, y, s * (z0 + k), B(y === 0 ? o.plinth || o.frame : o.frame));
+    if (y === y1 + 1 || y === y2 + 1) put(xb + dx, y, s * (z0 + deep + 1), st(o.stairs, IN));   // weathering on each set-back
+  }
+  gothicPinnacleAt(S, o, xb, yp + 1, s * (z0 + 2), 3, true, mine);
+  const span = Math.max(1, z0 - zw), ys = yp - Math.max(3, Math.round(span * 0.6));
+  let prevTop = null;
+  for (let a = z0; a >= zw; a--) {
+    const t = (z0 - a) / span, z = s * a;
+    let top = Math.round(yp + (yw - yp) * t), bot = Math.round(ys + (yw - 1 - ys) * Math.sin(t * Math.PI / 2));
+    const rh = RH.get(xb + ',' + z); if (rh !== undefined) bot = Math.max(bot, Math.ceil(rh));
+    if (prevTop !== null && bot > prevTop) bot = prevTop;      // stay joined to the previous column
+    if (top < bot + 1) top = bot + 1;
+    for (let y = bot; y <= top; y++) if (!/pane/.test(S.get(xb, y, z) || '')) put(xb, y, z, B(o.frame));
+    put(xb, top, z, st(o.stairs, IN));                          // the coping slopes up toward the wall
+    if (top - bot >= 2) put(xb, bot, z, st(o.stairs, OUT, 'top'));   // the underside curve
+    prevTop = top;
+    if (zMid !== null && a === zMid) {          // the intermediate pier: a column from the roof up into the arch, a pinnacle on the coping
+      const r0 = rh !== undefined ? Math.ceil(rh) : 1;
+      for (let y = r0; y < bot; y++) put(xb, y, z, B(o.frame));
+      gothicPinnacleAt(S, o, xb, top + 1, z, 3, false, mine);
+    }
+  }
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// Parts for the other styles (German / Italian / Spanish). World coordinates throughout.
+// ---------------------------------------------------------------------------------------------
+// An octagonal spire on (cx, y0, cz): base radius R0, height H.
+//   open  — Cologne: first an open octagonal stage (tall arches between eight corner piers, a gablet over each
+//           cardinal face, a small pinnacle on every corner), then the pierced spire: eight ribs with crockets every
+//           second row, solid bands every few rows, otherwise open faces with one mullion in the middle of each face
+//   solid — a plain needle with crockets on the ribs
+// mats: { frame, stairs, wall, slab } ; tip: block on the very top (e.g. gold for Milan's Madonnina)
+function gothicSpire(S, mats, cx, y0, cz, R0, H, mode, mine, tip, drum = 0) {
+  const put = (x, y, z, b) => { S.set(x, y, z, b); mine.add(x + ',' + y + ',' + z); };
+  const st = (f, h = 'bottom') => B(mats.stairs, { facing: f, half: h, shape: 'straight', waterlogged: false });
+  const post = () => B(mats.wall, { east: 'none', north: 'none', south: 'none', up: true, waterlogged: false, west: 'none' });
+  const rod = () => B('end_rod', { facing: 'up' });
+  const M = r => Math.round(r * 1.42);
+  const oct = (dx, dz, r) => Math.max(Math.abs(dx), Math.abs(dz)) <= r && Math.abs(dx) + Math.abs(dz) <= M(r);
+  const ringOf = r => { const c = []; for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) if (oct(dx, dz, r) && !oct(dx, dz, r - 1)) c.push([dx, dz]); return c; };
+  const isRib = (dx, dz, r) => { const ad = Math.abs(dx), az = Math.abs(dz), k = M(r) - r; return r <= 1 || (ad === r && az === k) || (az === r && ad === k); };
+  const isMid = (dx, dz, r) => { const ad = Math.abs(dx), az = Math.abs(dz); return (ad === r && az === 0) || (az === r && ad === 0) || (ad + az === M(r) && Math.abs(ad - az) <= 1); };
+  const crocket = (dx, dz, y) => { const ox = Math.sign(dx), oz = Math.sign(dz);
+    if (ox && !S.has(cx + dx + ox, y, cz + dz)) put(cx + dx + ox, y, cz + dz, st(ox > 0 ? 'west' : 'east'));
+    else if (oz && !S.has(cx + dx, y, cz + dz + oz)) put(cx + dx, y, cz + dz + oz, st(oz > 0 ? 'north' : 'south')); };
+  let yb = y0;
+  if (mode === 'open' && drum > 0) {                          // the open octagonal stage
+    for (let i = 0; i < drum; i++) for (const [dx, dz] of ringOf(R0)) {
+      const y = y0 + i, solid = i === 0 || i >= drum - 2 || isRib(dx, dz, R0);
+      if (solid) put(cx + dx, y, cz + dz, B(mats.frame)); else if (isMid(dx, dz, R0) && i < drum - 3) put(cx + dx, y, cz + dz, post());
+    }
+    for (const [dx, dz] of ringOf(R0)) if (isRib(dx, dz, R0)) { put(cx + dx, y0 + drum, cz + dz, B(mats.frame)); put(cx + dx, y0 + drum + 1, cz + dz, post()); put(cx + dx, y0 + drum + 2, cz + dz, rod()); }   // corner pinnacles
+    for (const [ux, uz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {   // a gablet over each cardinal face
+      const k = M(R0) - R0;
+      for (let t = -k; t <= k; t++) { const h = k - Math.abs(t); for (let j = 0; j <= h; j++) { const x = cx + (ux ? ux * R0 : t), z = cz + (uz ? uz * R0 : t); put(x, y0 + drum + j, z, j === h ? st(ux > 0 ? 'west' : ux < 0 ? 'east' : uz > 0 ? 'north' : 'south') : B(mats.frame)); } }
+      put(cx + ux * R0, y0 + drum + k + 1, cz + uz * R0, rod());
+    }
+    for (let dx = -R0; dx <= R0; dx++) for (let dz = -R0; dz <= R0; dz++) if (oct(dx, dz, R0 - 1)) put(cx + dx, y0 + drum - 1, cz + dz, B(mats.slab, { type: 'top', waterlogged: false }));   // floor of the spire
+    yb = y0 + drum; R0 = Math.max(2, R0 - 1);
+  }
+  let rPrev = -1;
+  for (let i = 0; i < H; i++) {
+    const y = yb + i, r = Math.max(0, Math.round(R0 * (1 - i / H))), step = rPrev > r, rp = rPrev; rPrev = r;
+    if (step) for (const [dx, dz] of ringOf(rp)) if (!oct(dx, dz, r - 1)) put(cx + dx, y, cz + dz, B(mats.frame));   // a ledge where it steps in, joining ring to ring
+    if (r === 0) { put(cx, y, cz, i < H - 2 ? B(mats.frame) : post()); continue; }
+    const band = mode === 'open' && (i % 6 === 0 || i < 1 || step);
+    for (const [dx, dz] of ringOf(r)) {
+      const rib = isRib(dx, dz, r);
+      if (mode === 'open' && !rib && !band) { if (isMid(dx, dz, r)) put(cx + dx, y, cz + dz, post()); continue; }   // open tracery: one mullion per face
+      put(cx + dx, y, cz + dz, B(mats.frame));
+      if (rib && i % 2 === 1) crocket(dx, dz, y);
+    }
+    if (mode !== 'open') for (let dx = -r + 1; dx <= r - 1; dx++) for (let dz = -r + 1; dz <= r - 1; dz++) if (oct(dx, dz, r - 1)) put(cx + dx, y, cz + dz, B(mats.frame));
+  }
+  const yt = yb + H;
+  if (tip) { put(cx, yt, cz, B(tip)); put(cx, yt + 1, cz, rod()); return yt + 2; }
+  put(cx, yt, cz, post()); put(cx, yt + 1, cz, rod());
+  for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(cx + a, yt, cz + b, B('end_rod', { facing: a > 0 ? 'east' : a < 0 ? 'west' : b > 0 ? 'south' : 'north' }));   // a cross-shaped finial
+  return yt + 2;
+}
+// Milan's crossing (tiburio): an octagonal drum with lancets and a pinnacle on every corner, a gallery, a second, smaller
+// open stage, then a slender open needle with the golden statue on top
+function gothicLantern(S, mats, cx, y0, cz, R, Hd, Hs, mine, pane) {
+  const put = (x, y, z, b) => { S.set(x, y, z, b); mine.add(x + ',' + y + ',' + z); };
+  const M = r => Math.round(r * 1.42);
+  const oct = (dx, dz, r) => Math.max(Math.abs(dx), Math.abs(dz)) <= r && Math.abs(dx) + Math.abs(dz) <= M(r);
+  const post = () => B(mats.wall, { east: 'none', north: 'none', south: 'none', up: true, waterlogged: false, west: 'none' });
+  for (let i = 0; i < Hd; i++) for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) {
+    if (!oct(dx, dz, R)) continue;
+    const ring = !oct(dx, dz, R - 1), y = y0 + i;
+    if (!ring) { if (i === Hd - 1) put(cx + dx, y, cz + dz, B(mats.frame)); continue; }
+    const win = i >= 2 && i <= Hd - 3 && (Math.abs(dx) <= 1 || Math.abs(dz) <= 1) && (Math.abs(dx) === R || Math.abs(dz) === R);
+    put(cx + dx, y, cz + dz, win ? pane(cx + dx, y, cz + dz, Math.abs(dx) === R ? 'z' : 'x') : B(mats.frame));
+  }
+  const yt = y0 + Hd;
+  for (let dx = -R - 1; dx <= R + 1; dx++) for (let dz = -R - 1; dz <= R + 1; dz++) if (oct(dx, dz, R + 1) && !oct(dx, dz, R)) put(cx + dx, yt - 1, cz + dz, B(mats.slab, { type: 'top', waterlogged: false }));   // cornice
+  for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) if (oct(dx, dz, R) && !oct(dx, dz, R - 1)) {
+    const ad = Math.abs(dx), az = Math.abs(dz), k = M(R) - R, corner = (ad === R && az === k) || (az === R && ad === k);
+    if (corner) { for (let j = 0; j < 4; j++) put(cx + dx, yt + j, cz + dz, j < 2 ? B(mats.frame) : post()); put(cx + dx, yt + 4, cz + dz, B('end_rod', { facing: 'up' })); }   // corner pinnacles
+    else if ((dx + dz) % 2 === 0) put(cx + dx, yt, cz + dz, post());   // gallery parapet
+  }
+  const R2 = Math.max(2, R - 3);                             // the second, open stage
+  for (let i = 0; i < 6; i++) for (let dx = -R2; dx <= R2; dx++) for (let dz = -R2; dz <= R2; dz++) {
+    if (!oct(dx, dz, R2) || oct(dx, dz, R2 - 1)) continue;
+    const ad = Math.abs(dx), az = Math.abs(dz), k = M(R2) - R2, corner = (ad === R2 && az === k) || (az === R2 && ad === k);
+    if (i === 0 || i >= 4 || corner) put(cx + dx, yt + i, cz + dz, B(mats.frame));
+  }
+  for (let dx = -R2; dx <= R2; dx++) for (let dz = -R2; dz <= R2; dz++) if (oct(dx, dz, R2 - 1)) { put(cx + dx, yt, cz + dz, B(mats.frame)); put(cx + dx, yt + 5, cz + dz, B(mats.frame)); }
+  return gothicSpire(S, mats, cx, yt + 6, cz, 2, Hs, 'open', mine, 'gold_block');
+}
+// A screen front (Italian / Spanish): no towers; the front follows the section — a gable (or a flat parapet) over the
+// nave, lower slopes over the aisles — divided by tall buttress piers that rise above the edge and end in pinnacles.
+// A portal in every strip, a big traceried window over each. Frame: u = world z, d outward = -x (as the west front).
+function gothicScreen(S, P, o) {
+  const { hw, NA, AW, edge, NT, IT, OT, ridge, flat } = P;
+  const mine = new Set();
+  const K = gothicKit(S, o, (u, v, d) => [-d, v, u], GOTHIC_FRONT_DIR, 'z', mine);
+  const { setD, ATT, put, st, FST } = K;
+  const piers = [hw + 1]; if (NA === 2) piers.push(hw + AW + 1); piers.push(edge + 1);
+  const isPier = au => piers.some(c => Math.abs(au - c) <= 1);
+  const U = edge + 2, us = []; for (let u = -U; u <= U; u++) us.push(u);
+  const topAt = au => {                                                   // the front's top edge over each strip
+    if (au <= hw) return flat ? NT + 3 : NT + 3 + Math.round((hw + 0.5 - au) * (ridge - NT) / (hw + 0.5));
+    if (au <= hw + AW) return flat ? IT + 3 : IT + 3 + Math.round((hw + AW + 0.5 - au) * 0.5);
+    return flat ? OT + 3 : OT + 3 + Math.round((edge + 0.5 - au) * 0.5);
+  };
+  for (const u of us) { const au = Math.abs(u); const t = isPier(au) ? topAt(Math.max(0, au - 2)) + 4 : topAt(au); for (let v = 0; v <= t; v++) setD(u, v, isPier(au) ? (v < t * 0.4 ? 3 : v < t * 0.75 ? 2 : 1) : 0, isPier(au) ? 'frame' : 'infill'); }
+  // strips: centre (nave), inner aisles, outer aisles
+  const strips = [[0, hw - 1]]; for (const s of [-1, 1]) { strips.push([s * (hw + 2 + ((AW - 3) >> 1)), (AW - 3) >> 1]); if (NA === 2) strips.push([s * (hw + AW + 2 + ((edge - hw - AW - 3) >> 1)), (edge - hw - AW - 3) >> 1]); }
+  let portals = 0, wins = 0;
+  for (const [uc, half] of strips) {
+    if (half < 1) continue;
+    const w = Math.max(3, (2 * half - 1) | 1), hs = Math.max(4, Math.round(w * 0.75)), ord = Math.max(1, Math.min(4, (w - 3) >> 1));
+    const ptop = gothicArchTop(w, hs) + (w >> 1) + 4;
+    K.portal(uc, w, hs, ord, 2, au => isPier(Math.abs(au)), Math.min(ptop, topAt(Math.abs(uc)) - 6)); portals++;
+    const v0 = Math.min(ptop, topAt(Math.abs(uc)) - 6) + 2, lw = Math.max(3, Math.min(9, (2 * half - 1) | 1)), lhs = topAt(Math.abs(uc)) - 4 - Math.floor(Math.sqrt(3) * lw / 2);
+    if (lhs - v0 >= 4) { K.lancet(uc, lw, v0, lhs, lw >= 7 ? 2 : 1, 0, topAt(Math.abs(uc)) - 1); wins++; }
+  }
+  K.fill();
+  for (const u of us) {                                                   // the top edge: crockets on slopes, a parapet on flats
+    const au = Math.abs(u); if (isPier(au)) continue;
+    const t = topAt(au), tn = topAt(Math.abs(u) + 1);
+    if (flat || t === tn) put(u, t + 1, 0, au % 2 ? K.post() : B(o.slab, { type: 'bottom', waterlogged: false }));
+    else if (au % 2 === 1) put(u, t + 1, 0, st(FST, u < 0 ? 'south' : 'north'));
+  }
+  for (const f of ATT) f();
+  for (const c of piers) for (const s of [-1, 1]) {
+    const u = s * c, t = topAt(Math.max(0, c - 2)) + 4;
+    for (let v = 6; v + 4 < t - 4; v += 9) { for (let y = v; y < v + 4; y++) put(u, y, 1, 'minecraft:air'); K.statue(u, v, 0); put(u, v + 4, 1, st(FST, 'east', 'top')); }
+    K.pinnacle(u, t + 1, 1, 4, true);
+  }
+  if (!flat) { const t = topAt(0); put(0, t + 1, 0, K.post()); put(0, t + 2, 0, K.post()); put(0, t + 3, 0, B('end_rod', { facing: 'up' })); }
+  return { mine, statues: K.statues, pins: K.pins, portals, windows: wins, width: 2 * U + 1 };
+}
+// Seville's Giralda: a square brick shaft with a lattice (sebka) of raised posts on its upper part, a belfry with arches,
+// then two stepped stages and a small cap with a weathervane. (x0, z0) = the shaft's corner, n = width.
+function gothicCampanile(S, o, x0, z0, n, H, mine) {
+  const put = (x, y, z, b) => { S.set(x, y, z, b); mine.add(x + ',' + y + ',' + z); };
+  const brick = o.brick || 'bricks', trim = o.frame;
+  const shaft = Math.round(H * 0.66), bel = Math.round(H * 0.12);
+  const ring = (x, z, a, w) => x === a || z === a || x === a + w - 1 || z === a + w - 1;
+  for (let y = 0; y < shaft; y++) for (let i = 0; i < n; i++) for (let k = 0; k < n; k++) {
+    const x = x0 + i, z = z0 + k, edge = i === 0 || k === 0 || i === n - 1 || k === n - 1;
+    if (!edge) { if (y === 0 || y % 12 === 0) put(x, y, z, B(brick)); continue; }
+    const corner = (i === 0 || i === n - 1) && (k === 0 || k === n - 1);
+    put(x, y, z, B(corner || y === 0 ? trim : brick));
+    // the lattice: a diamond net of brick posts standing out from the upper two-thirds of each face
+    if (!corner && y > shaft * 0.35 && y < shaft - 2) {
+      const u = i === 0 || i === n - 1 ? k : i, ox = i === 0 ? -1 : i === n - 1 ? 1 : 0, oz = k === 0 ? -1 : k === n - 1 ? 1 : 0;
+      if (u >= 2 && u <= n - 3 && ((u + y) % 4 === 0 || (u - y + 400) % 4 === 0)) put(x + ox, y, z + oz, B(o.brickWall || 'brick_wall', { east: 'none', north: 'none', south: 'none', up: true, waterlogged: false, west: 'none' }));
+      if (u === (n >> 1) && y % 9 === 4) { put(x, y, z, 'minecraft:air'); put(x, y + 1, z, 'minecraft:air'); }   // small windows up the middle
+    }
+  }
+  for (let y = shaft; y < shaft + bel; y++) for (let i = 0; i < n; i++) for (let k = 0; k < n; k++) {
+    if (!ring(x0 + i, z0 + k, x0, n) || !ring(i, k, 0, n)) continue;
+    const u = i === 0 || i === n - 1 ? k : i, arch = u >= 2 && u <= n - 3 && u !== (n >> 1) && y >= shaft + 1 && y <= shaft + bel - 3;
+    if (!arch) put(x0 + i, y, z0 + k, B(trim));
+  }
+  for (let i = -1; i <= n; i++) for (let k = -1; k <= n; k++) if (i === -1 || k === -1 || i === n || k === n) { put(x0 + i, shaft + bel, z0 + k, B(o.slab, { type: 'top', waterlogged: false })); if ((i + k) % 2 === 0) put(x0 + i, shaft + bel + 1, z0 + k, B(o.wall, { east: 'none', north: 'none', south: 'none', up: true, waterlogged: false, west: 'none' })); }
+  for (let i = 0; i < n; i++) for (let k = 0; k < n; k++) put(x0 + i, shaft + bel, z0 + k, B(trim));
+  put(x0 + (n >> 1), shaft + 1, z0 + (n >> 1), B('bell', { attachment: 'floor', facing: 'north', powered: false }));
+  // stepped stages
+  let y = shaft + bel + 1, w = n - 2, a = 1;
+  for (const hh of [Math.round(H * 0.09), Math.round(H * 0.07)]) {
+    if (w < 3) break;
+    for (let j = 0; j < hh; j++) for (let i = 0; i < w; i++) for (let k = 0; k < w; k++) {
+      const e = i === 0 || k === 0 || i === w - 1 || k === w - 1; if (!e) continue;
+      const mid = (i === (w >> 1) || k === (w >> 1)) && j >= 1 && j <= hh - 2;
+      if (!mid) put(x0 + a + i, y + j, z0 + a + k, B(trim));
+    }
+    for (let i = 0; i < w; i++) for (let k = 0; k < w; k++) put(x0 + a + i, y + hh, z0 + a + k, B(trim));
+    y += hh + 1; w -= 2; a += 1;
+  }
+  const cx = x0 + (n >> 1), cz = z0 + (n >> 1);
+  put(cx, y, cz, B(trim)); put(cx, y + 1, cz, B('gold_block')); put(cx, y + 2, cz, B('lightning_rod', { facing: 'up', powered: false, waterlogged: false }));
+  return y + 3;
+}
+// The court of oranges: a low arcaded wall round a gravel court, rows of small trees, a fountain in the middle.
+function gothicCourt(S, o, x0, x1, z0, z1, mine) {
+  const put = (x, y, z, b) => { S.set(x, y, z, b); mine.add(x + ',' + y + ',' + z); };
+  const leaves = B('azalea_leaves', { distance: 1, persistent: true, waterlogged: false });
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+    const e = x === x0 || x === x1 || z === z0 || z === z1;
+    put(x, 0, z, B(e ? o.frame : (x + z) % 2 ? 'smooth_sandstone' : 'cut_sandstone'));
+    if (!e) continue;
+    const along = z === z0 || z === z1 ? x - x0 : z - z0;
+    const door = (x === ((x0 + x1) >> 1) && (z === z0 || z === z1)) || (z === ((z0 + z1) >> 1) && x === x0);
+    for (let y = 1; y <= 4; y++) { if (door && y <= 3) continue; put(x, y, z, B(along % 3 === 0 || y === 4 ? o.frame : y === 3 ? o.frame : 'minecraft:air' === '' ? '' : o.frame)); }
+    if (along % 3 !== 0 && !door) { put(x, 1, z, 'minecraft:air'); put(x, 2, z, 'minecraft:air'); }     // an open arcade
+    put(x, 5, z, (x + z) % 2 ? B(o.wall, { east: 'none', north: 'none', south: 'none', up: true, waterlogged: false, west: 'none' }) : B(o.slab, { type: 'bottom', waterlogged: false }));
+  }
+  const cx = (x0 + x1) >> 1, cz = (z0 + z1) >> 1;
+  for (let x = x0 + 3; x <= x1 - 3; x += 4) for (let z = z0 + 3; z <= z1 - 3; z += 4) {
+    if (Math.abs(x - cx) <= 2 && Math.abs(z - cz) <= 2) continue;
+    put(x, 1, z, B('oak_log', { axis: 'y' })); put(x, 2, z, B('oak_log', { axis: 'y' }));
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { put(x + a, 3, z + b, leaves); if (!a || !b) put(x + a, 2, z + b, a || b ? leaves : B('oak_log', { axis: 'y' })); }
+    put(x, 4, z, leaves);
+  }
+  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) put(cx + a, 1, cz + b, a || b ? B(o.frame) : B('water', { level: 0 }));   // a basin with one source in the middle
+  put(cx, 0, cz, B(o.frame));
+}
+
+// ---------------------------------------------------------------------------------------------
 // Cathedral (主教座堂). Long axis along x like the church: the west front stands at x = 0, the east end
 // (chevet) at the far +x end; north is -z. The plan is a raster of zones, each with its own wall top:
 //   H  the high body: nave, crossing, transept, choir and apse (one height; gable roofs whose ridges cross)
@@ -3424,22 +4483,37 @@ function church(o = {}) {
 // French preset after Notre-Dame de Paris (128 × 48 m, vault 33 m, towers 69 m, flèche 96 m); the defaults are
 // that building at about 0.8 block per metre. Every size can be set on its own.
 // ---------------------------------------------------------------------------------------------
-const CATHEDRAL_STYLES = { french: '法式（巴黎圣母院）' };
+const CATHEDRAL_STYLES = { french: '法式（兰斯 / 巴黎圣母院）', german: '德式（科隆）', italian: '意式（米兰）', spanish: '西班牙（塞维利亚）' };
+// a style = a set of starting values; every value can still be changed afterwards (the panel copies them in when the style changes)
+const CATHEDRAL_PRESETS = {
+  french: { pinnacle_forest: false, facade: 'detailed', tower_top: 'flat', crossing: 'fleche', roof_style: 'pitched', campanile: false, court: false },
+  german: { pinnacle_forest: true, rose: false, kings: false, roof: 'stone', facade: 'detailed', tower_top: 'openwork', crossing: 'turret', roof_style: 'pitched', campanile: false, court: false, nave_bays: 10, width: 15, aisle_width: 6, arcade_height: 15, gallery_height: 4, clerestory_height: 15, transept_depth: 4, chapels: 7, roof_pitch: 'steep', walls: 'warm', fleche_height: 30 },
+  italian: { pinnacle_forest: true, facade: 'screen', tower_top: 'none', crossing: 'lantern', roof_style: 'pitched', campanile: false, court: false, nave_bays: 9, width: 19, aisle_width: 6, arcade_height: 16, gallery_height: 0, clerestory_height: 8, transept_depth: 4, east_end: 'apse', roof_pitch: 'normal', walls: 'marble', roof: 'stone', fleche_height: 30 },
+  spanish: { pinnacle_forest: false, facade: 'screen', tower_top: 'none', crossing: 'cimborio', roof_style: 'terrace', campanile: true, court: true, nave_bays: 9, width: 17, aisle_width: 7, arcade_height: 15, gallery_height: 0, clerestory_height: 10, transept_depth: 0, east_end: 'flat', walls: 'warm', roof: 'stone' },
+};
+const CATHEDRAL_TOWER_TOPS = { flat: '平顶 + 尖塔群（兰斯）', openwork: '镂空尖塔（科隆）', none: '无塔' };
+const CATHEDRAL_CROSSINGS = { fleche: '细尖塔（巴黎）', turret: '铜绿小尖塔（科隆）', lantern: '八角采光塔 + 金像（米兰）', cimborio: '抬高的方形采光塔（塞维利亚）', none: '无' };
+const CATHEDRAL_ROOF_STYLES = { pitched: '坡屋顶', terrace: '平台屋顶（带栏杆）' };
+// white marble (Milan); cathedral only
+const CATHEDRAL_MARBLE = { label: '白大理石', mix: [['calcite', 4], ['quartz_block', 2], ['diorite', 1]], plinth: 'polished_diorite', set: 'stone' };
+// warm yellow sandstone (as Reims / Cologne in the references); cathedral only, so the church's palettes stay as they were
+const CATHEDRAL_WARM = { label: '暖黄砂岩', mix: [['smooth_sandstone', 4], ['sandstone', 3], ['cut_sandstone', 2]], plinth: 'cut_sandstone', set: 'sandstone' };
+const CATHEDRAL_FACADES = { detailed: '精细双塔立面（扶壁、多层拱门、雕像、尖塔群）', screen: '屏风立面（无塔，米兰 / 塞维利亚）', simple: '简单（旧版平立面）' };
 const CATHEDRAL_EAST = { chevet: '回廊 + 放射小礼拜堂', apse: '半圆后殿', flat: '平直东端' };
 const CATHEDRAL_DEFAULT = {
-  style: 'french', nave_bays: 8, bay: 5, width: 11, aisles: 2, aisle_width: 4, transept: true, transept_depth: 2, choir_bays: 4,
-  east_end: 'chevet', chapels: 5, chapel_depth: 3, arcade_height: 9, gallery_height: 6, clerestory_height: 8, facade_extra: 2, tower_rise: 19,
-  rose: true, kings: true, flying_buttresses: true, pinnacles: true, fleche: true, fleche_height: 40, roof_pitch: 'medium',
+  style: 'french', facade: 'detailed', nave_bays: 9, bay: 8, width: 17, aisles: 2, aisle_width: 6, transept: true, transept_depth: 2, choir_bays: 4,
+  east_end: 'chevet', chapels: 5, chapel_depth: 4, arcade_height: 12, gallery_height: 6, clerestory_height: 13, facade_extra: 2, tower_rise: 24,
+  rose: true, kings: true, statues: true, portal_orders: 6, flying_buttresses: true, pinnacles: true, fleche: true, fleche_height: 50, roof_pitch: 'medium',
   walls: 'white', roof: 'slate', glass: 'colored', interior: false, seed: 1,
 };
 // the French preset's sizes at 1 block per metre; the panel's 比例 multiplies these (bay counts stay)
-const CATHEDRAL_BASE = { bay: 6, width: 13, aisle_width: 5, transept_depth: 2, chapel_depth: 4, arcade_height: 11, gallery_height: 8, clerestory_height: 10, facade_extra: 2, tower_rise: 24, fleche_height: 50 };
+const CATHEDRAL_BASE = { bay: 8, width: 17, aisle_width: 6, transept_depth: 2, chapel_depth: 4, arcade_height: 12, gallery_height: 6, clerestory_height: 13, facade_extra: 2, tower_rise: 24, fleche_height: 50 };   // 1.0 = the defaults (wide enough nave and aisles for the detailed front)
 const CATHEDRAL_RANGES = {
-  nave_bays: [3, 14], bay: [4, 8], width: [7, 21], aisle_width: [3, 7], transept_depth: [0, 10], choir_bays: [1, 10], chapels: [0, 9], chapel_depth: [2, 6],
-  arcade_height: [5, 16], gallery_height: [0, 12], clerestory_height: [4, 16], facade_extra: [1, 12], tower_rise: [8, 60], fleche_height: [10, 90],
+  nave_bays: [3, 14], bay: [4, 10], width: [7, 21], aisle_width: [3, 7], transept_depth: [0, 10], choir_bays: [1, 10], chapels: [0, 9], chapel_depth: [2, 6],
+  portal_orders: [1, 6], arcade_height: [5, 16], gallery_height: [0, 12], clerestory_height: [4, 16], facade_extra: [1, 12], tower_rise: [8, 60], fleche_height: [10, 90],
 };
 function cathedral(o = {}) {
-  const p = { ...CATHEDRAL_DEFAULT, ...o };
+  const p = { ...CATHEDRAL_DEFAULT, ...(CATHEDRAL_PRESETS[o.style] || {}), ...o };
   const cl = (v, a, b) => Math.max(a, Math.min(b, v));
   const report = [], adjust = [];
   const R = {};
@@ -3458,19 +4532,23 @@ function cathedral(o = {}) {
   const NT = IRT + CH;                                  // nave wall top
   const PR = ROOF_PITCHES[p.roof_pitch] || ROOF_PITCHES.medium, pitch = PR.r;
   const ridge = NT + 1 + Math.round(pitch * hw);
-  const FT = ridge + R.facade_extra, TT = FT + R.tower_rise;
+  const FT = ridge + R.facade_extra;
+  const detailed = (p.facade || 'detailed') !== 'simple', screen = p.facade === 'screen', terrace = p.roof_style === 'terrace';
+  const towers = !screen && p.tower_top !== 'none';
+  const GL = detailed && !screen ? gothicFrontLayout({ hw, edge: hw + NA * AW, NT, ridge, TT: FT + R.tower_rise }) : null;
+  const TT = GL ? GL.top : FT + R.tower_rise;
   const hasT = !!p.transept, tdep = hasT ? R.transept_depth : 0;
   const xN = NB * bay - 1, xc0 = hasT ? xN + 1 : 0, xc1 = hasT ? xN + W : -1, xcm = xc0 + hw;
   const xE = (hasT ? xc1 : xN) + CB * bay;
   const east = CATHEDRAL_EAST[p.east_end] ? p.east_end : 'chevet';
-  const nch = east === 'chevet' ? R.chapels : 0, cd = R.chapel_depth, CT = Math.max(4, OT - 2);
-  const TWD = edge - hw, TL = Math.min(TWD, Math.max(4, xN + 1 - bay));   // towers: as wide as the aisles, as long as that (or shorter on a short nave)
-  if (TL < TWD) report.push(`西塔：中殿太短，塔身沿长轴缩为 ${TL} 格`);
+  const nch = east === 'chevet' ? R.chapels : 0, cd = R.chapel_depth, CT = Math.max(4, p.pinnacle_forest ? OT : OT - 2);   // Cologne's chapels rise as high as the aisles
+  const TWD = edge - hw, TL = towers ? Math.min(TWD, Math.max(4, xN + 1 - bay)) : 0;   // towers: as wide as the aisles, as long as that (or shorter on a short nave)
+  if (towers && TL < TWD) report.push(`西塔：中殿太短，塔身沿长轴缩为 ${TL} 格`);
   const seed = p.seed || 1;
   const S = new Structure();
   // ---- materials (the same slots as the church) ----
   const matRep = [], MS = resolveMats(CHURCH_MAT_SLOTS, p.mats, matRep);
-  const WM0 = CHURCH_WALLS[p.walls] || CHURCH_WALLS.white, RM0 = CHURCH_ROOFS[p.roof] || CHURCH_ROOFS.slate;
+  const WM0 = p.walls === 'warm' ? CATHEDRAL_WARM : p.walls === 'marble' ? CATHEDRAL_MARBLE : CHURCH_WALLS[p.walls] || CHURCH_WALLS.white, RM0 = CHURCH_ROOFS[p.roof] || CHURCH_ROOFS.slate;
   const SM0 = FOUNTAIN_MATERIALS[WM0.set] || FOUNTAIN_MATERIALS.stone;
   const WM = { ...WM0, ...(MS.wall ? { mix: MS.wall.mix } : {}), ...(MS.plinth ? { plinth: MS.plinth.block } : {}) };
   const RM = MS.roof ? { ...RM0, stairs: MS.roof.stairs, slab: MS.roof.slab, block: MS.roof.block } : RM0;
@@ -3492,7 +4570,7 @@ function cathedral(o = {}) {
     const az = Math.abs(z);
     if (x < 0) return 0;
     if (x <= xE) {
-      if (x < TL && az > hw && az <= edge) return T;
+      if (towers && x < TL && az > hw && az <= edge) return T;
       if (az <= hw) return H;
       if (hasT && x >= xc0 && x <= xc1 && az <= edge + tdep) return H;
       if (az <= hw + AW) return I;
@@ -3563,6 +4641,7 @@ function cathedral(o = {}) {
   const hH = (x, z) => NT + 1 + Math.round(pitch * (dH(x, z) - 1));
   for (const [x, z] of cells) {
     if (zone(x, z) !== H) continue;
+    if (terrace) { S.set(x, NT + 1, z, border.has(x + ',' + z) ? (x + z) % 2 ? post() : B(SM.block) : slab(SM.slab)); RH.set(x + ',' + z, NT + 2); continue; }   // a walkable terrace behind a balustrade
     const h = hH(x, z);
     let up = null, uh = h, low = Infinity;
     for (const [dx, dz] of N4) {
@@ -3572,7 +4651,7 @@ function cathedral(o = {}) {
       low = Math.min(low, nh);
     }
     if (border.has(x + ',' + z)) for (let y = NT + 1; y < h; y++) S.set(x, y, z, wallB(x, y, z));    // gable ends
-    else for (let y = Math.max(NT + 1, low + 1); y < h; y++) S.set(x, y, z, B(RM.block));
+    else for (let y = Math.max(NT + 1, low); y < h; y++) S.set(x, y, z, B(RM.block));   // from the lowest neighbour's level, so the steps of a steep cone stay joined
     S.set(x, h, z, up ? stair(RM.stairs, DIR(...up)) : slab(RM.slab));
     RH.set(x + ',' + z, h + 1);
   }
@@ -3580,14 +4659,15 @@ function cathedral(o = {}) {
   const E = new Map(), q = [];
   for (const [x, z] of cells) {
     const zc = zone(x, z); if (zc !== I && zc !== O && zc !== C) continue;
-    if (N4.some(([dx, dz]) => top(x + dx, z + dz) < TOP[zc])) { E.set(x + ',' + z, 1); q.push([x, z]); }
+    if (N4.some(([dx, dz]) => (x > xE || !dx) && top(x + dx, z + dz) < TOP[zc])) { E.set(x + ',' + z, 1); q.push([x, z]); }   // slopes start at the side walls (not at the west or east ends)
   }
   for (let i = 0; i < q.length; i++) {
     const [x, z] = q[i], e = E.get(x + ',' + z);
-    for (const [dx, dz] of N4) { const k = (x + dx) + ',' + (z + dz); if (zone(x + dx, z + dz) === zone(x, z) && !E.has(k)) { E.set(k, e + 1); q.push([x + dx, z + dz]); } }
+    for (const [dx, dz] of N4) { const k = (x + dx) + ',' + (z + dz), zn = zone(x + dx, z + dz), zc = zone(x, z); if ((zn === zc || (zn && zn !== H && zn !== T && zc !== C && zn !== C && TOP[zn] === TOP[zc])) && !E.has(k)) { E.set(k, e + 1); q.push([x + dx, z + dz]); } }   // aisles of equal height share one slope
   }
   for (const [x, z] of cells) {
     const e = E.get(x + ',' + z); if (!e) continue;
+    if (terrace) { const y = TOP[zone(x, z)] + 1, edgeC = N4.some(([dx, dz]) => top(x + dx, z + dz) < TOP[zone(x, z)]); S.set(x, y, z, edgeC ? ((x + z) % 2 ? post() : B(SM.block)) : slab(SM.slab)); RH.set(x + ',' + z, y + 1); continue; }
     const y = TOP[zone(x, z)] + 1 + ((e - 1) >> 1), tp = (e - 1) & 1 ? 'top' : 'bottom';
     S.set(x, y, z, slab(RM.slab, tp)); RH.set(x + ',' + z, y + 1);
   }
@@ -3596,10 +4676,12 @@ function cathedral(o = {}) {
   for (const [x, z] of cells) {
     if (zone(x, z) !== T) continue;
     if (!border.has(x + ',' + z)) { S.set(x, TT, z, B(WD.planks)); S.set(x, FT, z, B(WD.planks)); }
-    else if (N8.some(([dx, dz]) => !zone(x + dx, z + dz) || top(x + dx, z + dz) < TT) && (x + z) % 2 === 0) S.set(x, TT + 1, z, wallB(x, TT + 1, z));
+    else if (!detailed && N8.some(([dx, dz]) => !zone(x + dx, z + dz) || top(x + dx, z + dz) < TT) && (x + z) % 2 === 0) S.set(x, TT + 1, z, wallB(x, TT + 1, z));
   }
 
-  // ---- west front: the wall between the towers rises to FT ----
+  // ---- west front (simple): the wall between the towers rises to FT ----
+  const KY = Math.max(AH + 1, 10), GY = FT - 5;
+  if (!detailed) {
   for (let z = -hw; z <= hw; z++) {
     for (let y = 1; y <= FT; y++) S.set(0, y, z, wallB(0, y, z));
     if ((z + hw) % 2 === 0) S.set(0, FT + 1, z, wallB(0, FT + 1, z));
@@ -3620,17 +4702,18 @@ function cathedral(o = {}) {
   portal(0);
   const sideZ = s => towerC(s)[1];
   portal(sideZ(-1)); portal(sideZ(1));
+  }
   // gallery of kings: a ledge, a row of figures, a cornice, across the whole front
-  const KY = Math.max(AH + 1, 10);
-  if (p.kings) for (let z = -edge; z <= edge; z++) {
+  if (!detailed && p.kings) for (let z = -edge; z <= edge; z++) {
     S.set(-1, KY, z, slab(SM.slab, 'top'));
     if ((z + edge) % 2 === 0) { S.set(-1, KY + 1, z, post()); S.set(-1, KY + 2, z, post()); }
     S.set(-1, KY + 3, z, stair(SM.stairs, 'east'));
   }
   // open gallery high between the towers
-  const GY = FT - 5;
-  for (let z = -hw; z <= hw; z++) for (let y = GY; y <= GY + 2; y++) S.set(0, y, z, (z + hw) % 2 ? AIR : post());
-  for (let z = -hw; z <= hw; z++) S.set(-1, GY - 1, z, slab(SM.slab, 'top'));
+  if (!detailed) {
+    for (let z = -hw; z <= hw; z++) for (let y = GY; y <= GY + 2; y++) S.set(0, y, z, (z + hw) % 2 ? AIR : post());
+    for (let z = -hw; z <= hw; z++) S.set(-1, GY - 1, z, slab(SM.slab, 'top'));
+  }
 
   // ---- glass ----
   const glassColors = MS.glass ? MS.glass.colors : { colored: ['red', 'blue', 'yellow', 'purple', 'lime', 'light_blue'], blue: ['blue', 'light_blue', 'cyan'], amber: ['yellow', 'orange', 'brown'], clear: [null] }[p.glass] || [null];
@@ -3658,7 +4741,8 @@ function cathedral(o = {}) {
     for (let du = -Rr - 1; du <= Rr + 1; du++) for (let dy = -Rr - 1; dy <= Rr + 1; dy++) if (du * du + dy * dy <= (Rr + 1) * (Rr + 1) + 1 && !isWall(S.get(...at(du, yc + dy)))) return false;
     for (let du = -Rr - 1; du <= Rr + 1; du++) for (let dy = -Rr - 1; dy <= Rr + 1; dy++) {
       const qq = du * du + dy * dy, k = at(du, yc + dy);
-      if (qq === 0 || (Rr >= 4 && (du === 0 || dy === 0) && qq <= 4)) S.set(...k, B(SM.accent));   // hub (and short spokes on a big rose)
+      const rr = Math.sqrt(qq), ang = Math.atan2(dy, du), sp = Math.abs((((ang / (Math.PI / 4)) % 1) + 1) % 1 - 0.5);
+      if (qq === 0 || (Rr >= 4 && ((rr > 1.2 && sp > 0.4 && rr < Rr - 0.5) || (rr > Rr * 0.5 && rr < Rr * 0.5 + 1)))) S.set(...k, B(SM.accent));   // hub, eight spokes and an inner ring (four short spokes read as a cross)
       else if (qq <= Rr * Rr + 1) S.set(...k, pane(...k, ax));
       else if (qq <= (Rr + 1) * (Rr + 1) + 1) S.set(...k, TRIM);
     }
@@ -3677,7 +4761,7 @@ function cathedral(o = {}) {
     const yc = p.rose ? tryRose(xcm, ze, true, NT, NT - 6, Rr) : null;
     lancet(xcm, ze, true, 2, (yc ? yc - Rr - 3 : NT - 3));
   }
-  if (p.rose) {                                          // west rose between the kings and the high gallery
+  if (p.rose && !detailed) {                             // west rose between the kings and the high gallery
     const lo = (p.kings ? KY + 4 : 10), Rr = Math.max(2, Math.min(4, hw - 1, ((GY - lo) >> 1) - 2));
     tryRose(0, 0, false, Math.round((lo + GY) / 2), lo + Rr + 1, Rr);
   }
@@ -3698,8 +4782,8 @@ function cathedral(o = {}) {
   }
 
   // ---- flying buttresses: a pier with a pinnacle outside the aisles, an arch of stone up to the clerestory ----
-  let nf = 0;
-  if (p.flying_buttresses) {
+  let nf = 0; const FLY = [];
+  if (p.flying_buttresses && !detailed) {   // the detailed cathedral draws its flyers with gothicFlyer (after the walls)
     const yp = Math.max(IRT, OT + 1 + lean(AW)) + 2, yw = NT - 2;
     for (let xb = 0; xb <= xE; xb += bay) {
       if (xb < TL + 1 || inCross(xb)) continue;
@@ -3708,7 +4792,8 @@ function cathedral(o = {}) {
         if (zone(xb, z1) || zone(xb, z2) || S.has(xb, 1, z1) || S.has(xb, 1, z2)) continue;
         for (let y = 0; y <= yp; y++) { S.set(xb, y, z1, B(y ? SM.block : WM.plinth)); S.set(xb, y, z2, B(y ? SM.block : WM.plinth)); }
         S.set(xb, yp + 1, z1, stair(SM.stairs, s > 0 ? 'north' : 'south'));
-        if (p.pinnacles) { S.set(xb, yp + 1, z2, post()); S.set(xb, yp + 2, z2, post()); S.set(xb, yp + 3, z2, post()); }
+        if (p.pinnacles && detailed) FLY.push([xb, yp + 1, z2]);   // a proper pinnacle goes on later (gothicPinnacleAt)
+        else if (p.pinnacles) { S.set(xb, yp + 1, z2, post()); S.set(xb, yp + 2, z2, post()); S.set(xb, yp + 3, z2, post()); }
         else S.set(xb, yp + 1, z2, stair(SM.stairs, s > 0 ? 'north' : 'south'));
         let py = yp;
         for (let a = edge; a >= hw + 1; a--) {
@@ -3716,6 +4801,7 @@ function cathedral(o = {}) {
           let y = Math.round(yp + (yw - yp) * t);
           const rh = RH.get(xb + ',' + z); if (rh !== undefined) y = Math.max(y, Math.ceil(rh));
           for (let yy = Math.min(py + 1, y); yy <= y; yy++) if (!/pane/.test(S.get(xb, yy, z) || '')) S.set(xb, yy, z, B(SM.block));
+          if (y > py && !S.has(xb, py, z)) S.set(xb, py, z, stair(SM.stairs, s > 0 ? 'south' : 'north', 'top'));   // join each step of the arch to the one below it
           py = y;
         }
         nf++;
@@ -3724,7 +4810,7 @@ function cathedral(o = {}) {
   }
 
   // ---- towers: tall belfry openings on every face, a bell ----
-  for (const s of [-1, 1]) {
+  if (!detailed) for (const s of [-1, 1]) {
     const faces = [[[0, s * (hw + 1)], [0, s * edge]], [[TL - 1, s * (hw + 1)], [TL - 1, s * edge]], [[0, s * edge], [TL - 1, s * edge]], [[0, s * (hw + 1)], [TL - 1, s * (hw + 1)]]];
     for (const [[ax0, az0], [ax1, az1]] of faces) {
       const len = Math.max(Math.abs(ax1 - ax0), Math.abs(az1 - az0)) + 1, k = Math.max(1, Math.floor(len / 3));
@@ -3740,7 +4826,8 @@ function cathedral(o = {}) {
 
   // ---- flèche over the crossing: an open drum, then a needle ----
   let fTop = 0;
-  if (p.fleche && hasT) {
+  const crossing = !p.fleche || !hasT ? 'none' : (CATHEDRAL_CROSSINGS[p.crossing] ? p.crossing : 'fleche');
+  if (crossing === 'fleche' || (crossing !== 'none' && !detailed)) {
     const y0 = ridge, Hf = R.fleche_height, n = Hf - 6;
     for (let y = y0; y < y0 + 6; y++) for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
       const corner = dx && dz, mid = !dx && !dz;
@@ -3757,6 +4844,113 @@ function cathedral(o = {}) {
     S.set(xcm, y, 0, post({ north: 'low', south: 'low' })); S.set(xcm, y, -1, post({ up: false, south: 'low' })); S.set(xcm, y, 1, post({ up: false, north: 'low' }));
     S.set(xcm, y + 1, 0, post()); S.set(xcm, y + 2, 0, B('lightning_rod', { facing: 'up', powered: false, waterlogged: false }));
     fTop = y + 3;
+  }
+
+  // ---- detailed west front ----
+  let GF = null;
+  if (detailed) {
+    const FM = { ...(GOTHIC_FACADE_MATS[p.walls] || GOTHIC_FACADE_MATS.white) };
+    if (MS.stone) Object.assign(FM, { frame: MS.stone.block, stairs: MS.stone.stairs, slab: MS.stone.slab, wall: MS.stone.wall || FM.wall });
+    const fo = { ...FM, checkA: p.walls === 'warm' ? 'cut_red_sandstone' : FM.frame, checkB: p.walls === 'warm' ? 'smooth_sandstone' : FM.niche, seed, rose: !!p.rose, kings: !!p.kings, statues: p.statues !== false, pinnacles: !!p.pinnacles, forest: !!p.pinnacles && !!p.pinnacle_forest, orders: R.portal_orders, door: WD.door.replace('_door', '_planks'), doorBack: WD.planks,
+      infill: (x, y, z) => wallB(x, y, z), pane: (x, y, z, ax) => pane(x, y, z, ax) };
+    if (screen) GF = gothicScreen(S, { hw, NA, AW, edge, NT, IT, OT, ridge, flat: terrace }, fo);
+    else GF = gothicFront(S, GL, { ...fo, towerTop: p.tower_top });
+    let st = GF.statues, pn = GF.pins;
+    const XM = { frame: FM.frame, stairs: FM.stairs, slab: FM.slab, wall: FM.wall };
+    if (!screen && p.tower_top === 'openwork') for (const s of [-1, 1]) {          // Cologne: an openwork spire on each tower
+      const cx = Math.floor((TL - 1) / 2), R0 = Math.max(2, Math.min(GL.th + 1, cx));
+      fTop = Math.max(fTop, gothicSpire(S, XM, cx, TT + 1, s * GL.tc, R0, R0 * 10, 'open', GF.mine, null, R0 * 2 + 2));
+      for (const [dx, dz] of [[-R0 - 1, -R0 - 1], [-R0 - 1, R0 + 1], [R0 + 1, -R0 - 1], [R0 + 1, R0 + 1]]) { gothicPinnacleAt(S, fo, cx + dx, TT + 1, s * GL.tc + dz, 4, false, GF.mine); pn++; }
+    }
+    if (crossing === 'turret') fTop = gothicSpire(S, { frame: 'oxidized_cut_copper', stairs: 'oxidized_cut_copper_stairs', slab: 'oxidized_cut_copper_slab', wall: 'prismarine_wall' }, xcm, ridge - 2, 0, 3, R.fleche_height, 'open', GF.mine, null, 7);   // an open copper stage, then the needle
+    if (crossing === 'lantern') fTop = gothicLantern(S, XM, xcm, NT + 1, 0, Math.max(3, Math.min(hw - 1, 7)), ridge - NT + 6, R.fleche_height, GF.mine, (x, y, z, ax) => pane(x, y, z, ax));
+    if (crossing === 'cimborio') {                       // Seville: the crossing raised as a lit square box with a balustrade
+      const h0 = NT + 1, h1 = NT + 9;
+      for (let x = xc0; x <= xc1; x++) for (let z = -hw; z <= hw; z++) {
+        const e = x === xc0 || x === xc1 || Math.abs(z) === hw;
+        if (e) for (let y = h0; y <= h1; y++) { const win = y >= h0 + 2 && y <= h1 - 2 && ((Math.abs(z) === hw && (x - xc0) % 3 === 1) || ((x === xc0 || x === xc1) && (z + hw) % 3 === 1)); S.set(x, y, z, win ? pane(x, y, z, Math.abs(z) === hw ? 'x' : 'z') : B(FM.frame)); GF.mine.add(x + ',' + y + ',' + z); }
+        S.set(x, h1 + 1, z, e ? ((x + z) % 2 ? post() : B(FM.frame)) : slab(SM.slab)); GF.mine.add(x + ',' + (h1 + 1) + ',' + z);
+      }
+      for (const [x, z] of [[xc0, -hw], [xc0, hw], [xc1, -hw], [xc1, hw]]) { gothicPinnacleAt(S, fo, x, h1 + 2, z, 3, false, GF.mine); pn++; }
+      fTop = Math.max(fTop, h1 + 6);
+    }
+    if (p.campanile) {                                    // Seville: the Giralda, free-standing north of the east end
+      const n = Math.max(7, Math.round(W * 0.6)) | 1, H2 = Math.round(NT * 2.1), x0 = (hasT ? xc1 + 3 : xE - n - 4), z0 = -(edge + 7 + n);
+      fTop = Math.max(fTop, gothicCampanile(S, { ...FM, brick: 'bricks', brickWall: 'brick_wall' }, x0, z0, n, H2, GF.mine));
+      report.push(`独立钟楼：${n}×${n}，高 ${H2}`);
+    }
+    if (p.court) {                                         // Seville: the court of oranges, north of the nave
+      const x0 = 2, x1 = Math.max(x0 + 12, (hasT ? xc0 : xE - 16) - 3), z1 = -(edge + 7), z0 = z1 - 22;
+      gothicCourt(S, FM, x0, x1, z0, z1, GF.mine);
+      report.push(`橘树庭院：${x1 - x0 + 1}×${z1 - z0 + 1}`);
+    }
+    if (!screen && TL >= 8) for (const s of [-1, 1]) { const r = gothicTowerSide(S, GL, fo, s, edge, 4, TL - 1, GF.mine); st += r.statues; pn += r.pins; }
+    // aisle walls of the nave and the choir, and the transept fronts below their roses
+    const vSide = NA === 2 ? OT : IT, eastX = east === 'flat' ? xE : xE - 1;
+    for (const s of [-1, 1]) {
+      gothicSideWall(S, fo, s, edge, TL + 1, hasT ? xc0 - 2 : eastX, bay, vSide, GF.mine);
+      if (hasT && xc1 + 2 < eastX) gothicSideWall(S, fo, s, edge, xc1 + 2, eastX, bay, vSide, GF.mine);
+      if (hasT && tdep >= 0) { const r = gothicTransept(S, { ...fo, bigWindow: !p.rose }, s, edge + tdep, xc0, xc1, p.rose ? Math.max(8, NT - 2 * Math.max(2, Math.min(4, hw - 1)) - 9) : NT, GF.mine, NT, ridge); st += r.statues;
+        if (tdep >= 1) for (const [sx, xf] of [[-1, xc0], [1, xc1]]) gothicShortWall(S, fo, sx, xf, s * (edge + 1), s * (edge + tdep - 1), vSide, GF.mine); }
+    }
+    // clerestory: piers where the flyers land, a lancet per bay (no clearing: the flyers and aisle roofs are in front)
+    const fc = { ...fo, clear: false };
+    for (const s of [-1, 1]) {
+      gothicSideWall(S, fc, s, hw, TL + 1, hasT ? xc0 - 2 : xE, bay, NT, GF.mine, IRT + 1);
+      if (hasT && xc1 + 2 < xE) gothicSideWall(S, fc, s, hw, xc1 + 2, xE, bay, NT, GF.mine, IRT + 1);
+    }
+    if (p.flying_buttresses) {
+      const yp = Math.max(IRT, OT + 1 + lean(AW)) + 2, yw = NT - 2, fl = { ...fo, plinth: WM.plinth, pinnacles: true };
+      for (let xb = 0; xb <= xE; xb += bay) {
+        if (xb < TL + 1 || inCross(xb)) continue;
+        for (const s of [-1, 1]) { if (zone(xb, s * (edge + 1)) || zone(xb, s * (edge + 3))) continue; gothicFlyer(S, fl, s, xb, edge, yp, hw + 1, yw, RH, GF.mine, fo.forest && NA === 2 ? hw + AW : null); nf++; pn++; }
+      }
+    }
+    // east end: a stepped pier with a pinnacle between every two radiating chapels (or round the apse)
+    if (east !== 'flat') {
+      const rOut = east === 'chevet' ? (NA === 2 ? edge : hw + AW) : hw, nP = east === 'chevet' ? Math.max(2, nch + 1) : 5, top = east === 'chevet' ? (NA === 2 ? OT : IT) : NT;
+      for (let k = 0; k < nP; k++) {
+        const a = -Math.PI / 2 + Math.PI * k / (nP - 1);
+        for (const rr of [rOut + 1, rOut + 2]) {
+          const x = xE + Math.round(Math.cos(a) * rr), z = Math.round(Math.sin(a) * rr);
+          if (x <= xE || zone(x, z) || S.has(x, 2, z)) continue;
+          const h = rr === rOut + 1 ? top : top - 4;
+          for (let y = 0; y <= h; y++) S.set(x, y, z, B(y ? FM.frame : WM.plinth));
+          if (rr === rOut + 2) { gothicPinnacleAt(S, fo, x, h + 1, z, 2, false, GF.mine); pn++; }
+          else { gothicPinnacleAt(S, fo, x, h + 1, z, 3, true, GF.mine); pn++; }
+        }
+        if (east !== 'chevet' || !p.flying_buttresses) continue;
+        // a flyer from the inner pier up to the apse's high wall, and a pilaster on that wall where it lands
+        const y0 = top + 1, y1 = NT - 2; let py = null, pxz = null;
+        for (let rr = rOut; rr >= hw + 1; rr--) {
+          const x = xE + Math.round(Math.cos(a) * rr), z = Math.round(Math.sin(a) * rr);
+          if (x <= xE) { py = null; pxz = null; continue; }
+          let y = Math.round(y0 + (y1 - y0) * (rOut - rr) / Math.max(1, rOut - hw - 1));
+          const rh = RH.get(x + ',' + z); if (rh !== undefined) y = Math.max(y, Math.ceil(rh));
+          const col = (cx, cz, ya, yb) => { for (let yy = ya; yy <= yb; yy++) if (!/pane/.test(S.get(cx, yy, cz) || '')) { S.set(cx, yy, cz, B(FM.frame)); GF.mine.add(cx + ',' + yy + ',' + cz); } };
+          if (pxz && pxz[0] !== x && pxz[1] !== z) col(pxz[0], z, Math.min(py, y), Math.max(py, y));   // a diagonal step: fill the corner so the arch stays joined
+          col(x, z, py === null ? y : Math.min(py, y), y);
+          py = y; pxz = [x, z];
+        }
+        const xw = xE + Math.round(Math.cos(a) * (hw + 1)), zw = Math.round(Math.sin(a) * (hw + 1));
+        if (xw > xE) for (let y = IRT + 1; y <= NT; y++) if (!S.has(xw, y, zw)) { S.set(xw, y, zw, B(FM.frame)); GF.mine.add(xw + ',' + y + ',' + zw); }
+        if (xw > xE && fo.forest) { gothicPinnacleAt(S, fo, xw, NT + 1, zw, 4, true, GF.mine); pn++; }   // Cologne: a big pinnacle over every pilaster of the choir
+      }
+    }
+    for (const [x, z] of cells) {                 // chapels: a frame plinth and an overhanging cornice
+      if (zone(x, z) !== C || !border.has(x + ',' + z)) continue;
+      for (const [dx, dz] of N4) if (!zone(x + dx, z + dz)) {
+        if (!S.has(x + dx, 1, z + dz)) S.set(x + dx, 1, z + dz, stair(FM.stairs, DIR(-dx, -dz)));
+        if (!S.has(x + dx, CT, z + dz)) S.set(x + dx, CT, z + dz, stair(FM.stairs, DIR(-dx, -dz), 'top'));
+      }
+    }
+    for (const k of GF.mine) {                     // anything of ours standing on a bottom slab would hover half a block: make that slab a full block
+      const b = S.blocks.get(k); if (!b || /_slab|_stairs|end_rod|_pane/.test(b)) continue;
+      const [x, y, z] = k.split(',').map(Number), u = S.get(x, y - 1, z);
+      if (u && /_slab\[.*type=bottom/.test(u)) S.set(x, y - 1, z, B(FM.frame));
+    }
+    const nfl = gothicDropFloating(S, GF.mine);
+    report.push(`${screen ? '屏风立面' : '精细西立面'}：宽 ${GF.width}，${st} 座雕像、${pn} 座小尖塔`);
   }
 
   // ---- inside (off by default): altar in the apse, choir stalls, hanging lanterns ----
@@ -3777,7 +4971,7 @@ function cathedral(o = {}) {
     (hasT ? `；耳堂伸出侧廊外 ${tdep} 格` : '') + `；唱诗堂 ${CB} 开间；东端${CATHEDRAL_EAST[east]}` + (nch ? `（${nch} 个小礼拜堂）` : '') +
     `；剖面：拱廊 ${AH}` + (GH ? ` + 楼廊 ${GH}` : '') + ` + 高侧窗 ${CH}，中殿墙高 ${NT}、屋脊 ${ridge}；西立面高 ${FT}，双塔高 ${TT}` + (fTop ? `，交叉处尖塔顶 ${fTop}` : '') +
     `；窗 ${nw} 扇、玫瑰窗 ${roses} 扇、飞扶壁 ${nf} 道；总尺寸 ${bx1 - bx0 + 1}×${bz1 - bz0 + 1}，高 ${by1 + 1}` + (p.interior ? '；内部有祭坛、唱诗席' : ''));
-  const spec = { ...p, ...R, width: W, aisles: NA, east_end: east, chapels: nch || R.chapels };
+  const spec = { ...p, ...R, facade: detailed ? 'detailed' : 'simple', width: W, aisles: NA, east_end: east, chapels: nch || R.chapels };
   return { S, foot: [bx0, bx1, bz0, bz1], tags: ['landmark', 'cathedral'], report, spec, adjust };
 }
 
@@ -5674,6 +6868,6 @@ function applyZones(T, zones, c) {
   return out;
 }
 
-const api = { initData, LANDMARK_PLACE, generate, WINDOW_MATERIALS, WINDOW_VARIANTS, WINDOW_COLORS, windowChoice, applyWindowMaterial, schemNBT, solve, buildHouse, applyColors, Structure, HouseBuilder, currentRoles, STYLES, CURVES, MIX_DEFAULT, PLAN_LABEL, FUNCTION_LABEL, ANNEX_LABEL, ROOF_STYLES, DORMER_STYLES, SUPPORTED, synthTerrain, Terrain, PROPS, lampPost, tree, well, placeProp, checkPlacement, plaza, LANDMARKS, PLAZA_SHAPES, PLAZA_PATTERNS, PLAZA_CENTERS, PLAZA_PAVING, stall, STALL_ROOFS, fountainProp, church, CHURCH_KINDS, cathedral, CATHEDRAL_STYLES, CATHEDRAL_EAST, CATHEDRAL_DEFAULT, CATHEDRAL_BASE, CATHEDRAL_RANGES, CHURCH_MAT_SLOTS, MAT_KINDS, matBlocks, matGlassList, resolveMats, TOWER_POS, CHURCH_SIDES, CHURCH_PORCH, CHURCH_WALLS, CHURCH_ROOFS, TOWER_TOPS, ROOF_PITCHES, SPIRE_HEIGHTS, CHURCH_WINDOWS, monument, MONUMENT_TYPES, MONUMENT_TOPS, RIBBONS, FOUNTAIN_SHAPES, FOUNTAIN_RIMS, FOUNTAIN_TOPS, FOUNTAIN_MATERIALS, STALL_WARES, STALL_COLORS, PLAZA_TREE_LAYOUTS, street, ROAD_KINDS, BRIDGE_STYLES, ROAD_CURVES, curvePoints, town, composeTown, planDistrict, districtGrid, zoneMask, maskOutline, shapesMask, rectPoly, ellipsePoly, edgeCost, liveWire, SEL_SHAPES, SEL_OPS, DISTRICT_STYLES, DISTRICT_DENSITY, DISTRICT_LANDMARKS, DISTRICT_TIERS, HOUSE_SIZES, cloneTerrain, retouchTown, emptyScene, fixConnections, stairShapes, rotQuarter, _py: { PyRandom, deriveSeed, _h, pyRound, fmt } };
+const api = { initData, LANDMARK_PLACE, generate, WINDOW_MATERIALS, WINDOW_VARIANTS, WINDOW_COLORS, windowChoice, applyWindowMaterial, schemNBT, solve, buildHouse, applyColors, Structure, HouseBuilder, currentRoles, STYLES, CURVES, MIX_DEFAULT, PLAN_LABEL, FUNCTION_LABEL, ANNEX_LABEL, ROOF_STYLES, DORMER_STYLES, SUPPORTED, synthTerrain, Terrain, PROPS, lampPost, tree, well, placeProp, checkPlacement, plaza, LANDMARKS, PLAZA_SHAPES, PLAZA_PATTERNS, PLAZA_CENTERS, PLAZA_PAVING, stall, STALL_ROOFS, fountainProp, church, CHURCH_KINDS, cathedral, CATHEDRAL_STYLES, CATHEDRAL_PRESETS, CATHEDRAL_TOWER_TOPS, CATHEDRAL_CROSSINGS, CATHEDRAL_ROOF_STYLES, CATHEDRAL_FACADES, CATHEDRAL_EAST, CATHEDRAL_DEFAULT, CATHEDRAL_BASE, CATHEDRAL_RANGES, CHURCH_MAT_SLOTS, MAT_KINDS, matBlocks, matGlassList, resolveMats, TOWER_POS, CHURCH_SIDES, CHURCH_PORCH, CHURCH_WALLS, CHURCH_ROOFS, TOWER_TOPS, ROOF_PITCHES, SPIRE_HEIGHTS, CHURCH_WINDOWS, monument, MONUMENT_TYPES, MONUMENT_TOPS, RIBBONS, FOUNTAIN_SHAPES, FOUNTAIN_RIMS, FOUNTAIN_TOPS, FOUNTAIN_MATERIALS, STALL_WARES, STALL_COLORS, PLAZA_TREE_LAYOUTS, street, ROAD_KINDS, BRIDGE_STYLES, ROAD_CURVES, curvePoints, town, composeTown, planDistrict, districtGrid, zoneMask, maskOutline, shapesMask, rectPoly, ellipsePoly, edgeCost, liveWire, SEL_SHAPES, SEL_OPS, DISTRICT_STYLES, DISTRICT_DENSITY, DISTRICT_LANDMARKS, DISTRICT_TIERS, HOUSE_SIZES, cloneTerrain, retouchTown, emptyScene, fixConnections, stairShapes, rotQuarter, GAME_VERSIONS, GAME_VERSION_DEFAULT, verState, verReport, verDV, GREEN_GROUND, GREEN_COVER, GREEN_FLOWERS, GREEN_SHRUBS, GREEN_TREES, GREEN_EDGES, GREEN_BORDERS, GREEN_SHRUB_SIZES, GREEN_PREVIEWS, GREEN_SWATCHES, GREEN_RECIPE_DEFAULT, GREEN_DEFAULT, greenRecipe, greenSwatchRecipe, greenPaint, greenPatch, greenOverlay, greenWith, greenMaxAmount, greenAuto, greenBounds, greenReach, _py: { PyRandom, deriveSeed, _h, pyRound, fmt } };
 if (typeof module === 'object' && module.exports) module.exports = api; else root.MCGen = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
