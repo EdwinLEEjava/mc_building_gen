@@ -42,6 +42,7 @@ function violation(m, rules) {
 }
 function solve(spec) {
   const s = { ...DEFAULT_SPEC, ...spec };
+  if (!Number.isInteger(s.floors) || s.floors < 1) throw new Error("层数必须为大于 0 的整数。");
   const rules = { ...(STYLE_RULES[s.palette] || DEFAULT_RULES) };
   const style = s.roof_style !== undefined ? s.roof_style : 'gable';
   if (style in ROOF_STYLE_BAND) {
@@ -61,7 +62,8 @@ function solve(spec) {
   if (PITCHLESS.has(style)) { reqPitch = s.roof_pitch = 'normal'; pitchOpts = ['normal']; }
   else pitchOpts = reqPitch === 'auto' ? PITCHES : [reqPitch, ...PITCHES.filter(p => p !== reqPitch)];
   const uniqSorted = a => [...new Set(a)].sort((x, y) => x - y);
-  const floorsOpts = uniqSorted([0, 1, -1, 2].map(d => Math.max(1, Math.min(3, s.floors + d))));
+  // Keep the requested floor count; correct the remaining proportions around it.
+  const floorsOpts = [s.floors];
   const fhOpts = uniqSorted([s.floor_height, 4, 5]);
   const flareOpts = [s.flared_eave, !s.flared_eave], jettyOpts = [s.jetty, !s.jetty];
   let best = null;

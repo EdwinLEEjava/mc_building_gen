@@ -6,6 +6,14 @@ from mcgen.colors import apply_colors
 from mcgen.palettes import PALETTES
 from mcgen.layout import PLAN_LABEL
 from mcgen.annex import ANNEX_LABEL, FUNCTION_LABEL
+# Invalid floor counts must not reach the building step.
+for floors in (0, -1, 1.5, None, False, "2"):
+    try:
+        solve({"floors": floors})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"Invalid floor count accepted: {floors!r}")
 out = []
 for sp in json.load(open('web/test/specs.json')):
     try:
