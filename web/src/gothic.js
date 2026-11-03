@@ -54,7 +54,10 @@ function gothicKit(S, o, W, dir, ax, mine) {
   K.fill = () => {
     for (const [k, d] of D) {
       const [u, v] = k.split(',').map(Number), role = R.get(k), hole = HOLE.get(k);
-      if (hole === 'void') { for (let dd = Math.max(d, 1); dd >= -5; dd--) put(u, v, dd, 'minecraft:air'); continue; }   // open right through (also through the tower wall behind)
+      if (hole === 'void') {   // open right through (also through the tower wall behind); with louvres: a slat every second row just inside the face
+        for (let dd = Math.max(d, 1); dd >= -5; dd--) put(u, v, dd, o.louvers && dd === d - 1 && v % 2 === 0 ? B(o.louver || 'dark_oak_slab', { type: 'top', waterlogged: false }) : 'minecraft:air');
+        continue;
+      }
       if (o.clear !== false) for (let dd = d + 1; dd <= d + 6; dd++) { const [x, y, z] = W(u, v, dd); if (S.has(x, y, z)) S.set(x, y, z, null); }   // clear what the building left in front of this cell (roof ends, old walls)
       let back = Math.min(d - (o.thick ?? 2), o.backMax ?? -3);
       for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = getD(u + a, v + b); if (n !== undefined && n < back) back = n; }
@@ -357,6 +360,10 @@ function gothicFlyer(S, o, s, xb, z0, yp, zw, yw, RH, mine, zMid = null) {   // 
   const put = (x, y, z, b) => { S.set(x, y, z, b); mine.add(x + ',' + y + ',' + z); };
   const st = (m, f, h = 'bottom') => B(m, { facing: f, half: h, shape: 'straight', waterlogged: false });
   const IN = s > 0 ? 'north' : 'south', OUT = s > 0 ? 'south' : 'north';
+  // double (Cologne, Paris): the pier rises 7 higher and carries the upper arch; a second, thinner arch springs from
+  // just under it (the old pier top) and lands lower on the clerestory wall
+  const two = (o.flyerLevels | 0) >= 2 && o.wallLow !== undefined && yw - 7 >= o.wallLow + 3 && yw - 7 > yp;
+  const yLo = yp; if (two) yp += 7;
   const y1 = Math.round(yp * 0.45), y2 = Math.round(yp * 0.75);
   for (let y = 0; y <= yp; y++) for (let dx = -1; dx <= 1; dx++) {
     const deep = y <= y1 ? 5 : y <= y2 ? 4 : 3;
@@ -365,7 +372,7 @@ function gothicFlyer(S, o, s, xb, z0, yp, zw, yw, RH, mine, zMid = null) {   // 
   }
   gothicPinnacleAt(S, o, xb, yp + 1, s * (z0 + 2), 3, true, mine);
   const span = Math.max(1, z0 - zw), ys = yp - Math.max(3, Math.round(span * 0.6));
-  let prevTop = null;
+  let prevTop = null; const upBot = new Map();
   for (let a = z0; a >= zw; a--) {
     const t = (z0 - a) / span, z = s * a;
     let top = Math.round(yp + (yw - yp) * t), bot = Math.round(ys + (yw - 1 - ys) * Math.sin(t * Math.PI / 2));
@@ -375,11 +382,35 @@ function gothicFlyer(S, o, s, xb, z0, yp, zw, yw, RH, mine, zMid = null) {   // 
     for (let y = bot; y <= top; y++) if (!/pane/.test(S.get(xb, y, z) || '')) put(xb, y, z, B(o.frame));
     put(xb, top, z, st(o.stairs, IN));                          // the coping slopes up toward the wall
     if (top - bot >= 2) put(xb, bot, z, st(o.stairs, OUT, 'top'));   // the underside curve
-    prevTop = top;
+    prevTop = top; upBot.set(a, bot);
     if (zMid !== null && a === zMid) {          // the intermediate pier: a column from the roof up into the arch, a pinnacle on the coping
       const r0 = rh !== undefined ? Math.ceil(rh) : 1;
       for (let y = r0; y < bot; y++) put(xb, y, z, B(o.frame));
       gothicPinnacleAt(S, o, xb, top + 1, z, 3, false, mine);
     }
   }
+  let levels = 1;
+  if (two) {
+    const cols = [];
+    for (let a = z0; a >= zw; a--) {
+      const t = (z0 - a) / span, z = s * a;
+      let top = Math.round(yLo - 2 + (yw - 7 - (yLo - 2)) * t), bot = top - 1;
+      const rh = RH.get(xb + ',' + z); if (rh !== undefined && bot < Math.ceil(rh)) { bot = Math.ceil(rh); top = bot + 1; }
+      if (top >= (upBot.get(a) ?? Infinity) - 1) { cols.length = 0; break; }   // no room under the upper arch: leave the lower one out
+      cols.push([z, bot, top]);
+    }
+    for (let i = 0; i < cols.length; i++) {
+      const [z, bot, top] = cols[i], lo = Math.min(bot, i ? cols[i - 1][2] : bot);   // stay joined to the previous column
+      for (let y = lo; y <= top; y++) if (!/pane/.test(S.get(xb, y, z) || '')) put(xb, y, z, B(o.frame));
+      put(xb, top, z, st(o.stairs, IN));
+      if (top - lo >= 2) put(xb, lo, z, st(o.stairs, OUT, 'top'));
+    }
+    if (cols.length) levels = 2;
+  }
+  if (o.gargoyles) {                             // a spout out of the top stage of the pier, under the pinnacle
+    const yg = yp - 1;
+    put(xb, yg, s * (z0 + 4), st(o.stairs, IN, 'top'));
+    put(xb, yg, s * (z0 + 5), B(o.head || o.frame));
+  }
+  return { levels, gargoyles: o.gargoyles ? 1 : 0 };
 }
