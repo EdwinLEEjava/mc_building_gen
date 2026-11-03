@@ -12,3 +12,9 @@ web/test/py.json
 *.jar
 *.mcpack
 resourcepacks/
+# 由 build_viewer.py 生成，不进仓库（避免每个分支都改它们而互相冲突）：
+# 拉取代码后运行 scripts/build.bat，或运行一次 scripts/setup-hooks.bat 让它自动生成
+web/mcgen.js
+web/mcgen_data.json
+viewer/index.html
+viewer/compare.html
