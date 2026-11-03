@@ -1,5 +1,5 @@
 """Generate the sample builds (through the proportion rules) and embed them in the viewer page.
-python build_viewer.py            -> viewer/index.html
+python build_viewer.py            -> web/mcgen.js, web/mcgen_data.json and viewer/index.html (the one build command)
 python build_viewer.py --compare  -> viewer/compare.html (raw request vs. corrected, for screenshots)
 """
 import base64, json, sys
@@ -109,6 +109,10 @@ def gen_js():
 
 
 if __name__ == "__main__":
+    import os, subprocess
+    os.makedirs("out", exist_ok=True)
+    # one command builds everything: web/mcgen.js + web/mcgen_data.json (for Node / the tests) and the viewer page
+    subprocess.run([sys.executable, "web/build_js.py"], check=True)
     compare = "--compare" in sys.argv
     if compare:
         items = []
