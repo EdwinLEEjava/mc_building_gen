@@ -364,14 +364,19 @@ function gothicPinnacleAt(S, o, x, y, z, h, big, mine) {
   K.pinnacle(z, y, -x, h, big);
 }
 // a short plain wall (transept east / west sides): plinth, sill course, cornice with an open parapet. Face plane x = xf.
-function gothicShortWall(S, o, sx, xf, z0, z1, vTop, mine) {
+function gothicShortWall(S, o, sx, xf, z0, z1, vTop, mine, bay = 0) {   // bay > 0: a window in every bay (long walls)
   const dir = sx < 0 ? { in: 'east', out: 'west', un: 'north', up: 'south' } : { in: 'west', out: 'east', un: 'north', up: 'south' };
   const K = gothicKit(S, { ...o, thick: 1, backMax: -1 }, (u, v, d) => [xf + sx * d, v, u], dir, 'z', mine);
   const us = []; for (let u = Math.min(z0, z1); u <= Math.max(z0, z1); u++) us.push(u);
   for (let v = 0; v <= vTop; v++) for (const u of us) K.setD(u, v, v <= 1 ? 1 : 0, v <= 1 ? 'frame' : 'infill');
+  if (bay >= 6) {
+    const w = 5, hs = vTop - 4 - gothicArchTop(w, 0), lo = us[0], hi = us[us.length - 1];
+    if (hs - 3 >= 4) for (let um = lo + (bay >> 1); um + (w >> 1) + 1 <= hi; um += bay) if (um - (w >> 1) - 1 >= lo) K.lancet(um, w, 3, hs, 1, 0, vTop - 1);
+  }
   K.fill();
   const rows = [2, vTop]; rows.parapet = [vTop];
   K.courses(rows, us, () => false);
+  for (const f of K.ATT) f();
 }
 // a flying buttress (single): a pier outside the aisle wall, 3 wide, stepping in twice, crowned by a pinnacle of the
 // pier's own width; an arch whose top is a straight sloping coping and whose underside is a curve, thick at the pier and

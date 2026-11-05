@@ -11,6 +11,7 @@
 // that building at about 0.8 block per metre. Every size can be set on its own.
 // ---------------------------------------------------------------------------------------------
 const CATHEDRAL_STYLES = { french: '法式（兰斯 / 巴黎圣母院）', german: '德式（科隆）', italian: '意式（米兰）', spanish: '西班牙（塞维利亚）', english: '英式（索尔兹伯里 / 林肯）', romanesque: '罗马式（施派尔 / 沃尔姆斯）' };
+const CATHEDRAL_PLANS = { latin: '拉丁十字', greek: '希腊十字（四臂等长）', hall: '厅堂式（侧廊与中殿等高，一整片屋顶）' };
 const CATHEDRAL_ARCHES = { pointed: '尖拱（哥特）', round: '圆拱（罗马式）' };
 // a style = a set of starting values; every value can still be changed afterwards (the panel copies them in when the style changes)
 const CATHEDRAL_PRESETS = {
@@ -35,7 +36,7 @@ const CATHEDRAL_WARM = { label: '暖黄砂岩', mix: [['smooth_sandstone', 4], [
 const CATHEDRAL_FACADES = { detailed: '精细双塔立面（扶壁、多层拱门、雕像、尖塔群）', screen: '屏风立面（无塔，米兰 / 塞维利亚）', simple: '简单（旧版平立面）' };
 const CATHEDRAL_EAST = { chevet: '回廊 + 放射小礼拜堂', apse: '半圆后殿', flat: '平直东端' };
 const CATHEDRAL_DEFAULT = {
-  style: 'french', arch: 'pointed', facade: 'detailed', nave_bays: 9, bay: 8, width: 17, aisles: 2, aisle_width: 6, transept: true, transept_depth: 2, choir_bays: 4,
+  style: 'french', plan: 'latin', arch: 'pointed', facade: 'detailed', nave_bays: 9, bay: 8, width: 17, aisles: 2, aisle_width: 6, transept: true, transept_depth: 2, choir_bays: 4,
   east_end: 'chevet', chapels: 5, chapel_depth: 4, arcade_height: 12, gallery_height: 6, clerestory_height: 13, facade_extra: 2, tower_rise: 24,
   rose: true, kings: true, statues: true, portal_orders: 6, flying_buttresses: true, flyer_levels: 1, louvers: true, dormers: false, pinnacles: true, fleche: true, fleche_height: 50, roof_pitch: 'medium',
   walls: 'white', roof: 'slate', glass: 'colored', interior: false, seed: 1,
@@ -59,23 +60,29 @@ function _cathedral(o) {
     R[k] = cl(p[k] | 0, a, b);
     if (o[k] !== undefined && R[k] !== (o[k] | 0)) adjust.push({ key: k, got: R[k], why: `允许范围 ${a}–${b}` });
   }
-  const bay = R.bay, NB = R.nave_bays, CB = R.choir_bays;
+  // plan type: Latin cross (the default); Greek cross: the nave as long as the choir and a transept whose arms reach as
+  // far, so all four arms are equal; hall: the aisles as tall as the nave under one big roof (no clerestory, no flyers)
+  const plan = CATHEDRAL_PLANS[p.plan] ? p.plan : 'latin', greek = plan === 'greek', hall = plan === 'hall';
+  const bay = R.bay, CB = R.choir_bays, NB = greek ? CB : R.nave_bays;
   const W = R.width | 1, hw = W >> 1;
   if (W !== R.width) adjust.push({ key: 'width', got: W, why: '中殿宽必须是奇数，屋脊和中门才能落在正中一格' });
   const NA = (p.aisles | 0) === 1 ? 1 : 2, AW = R.aisle_width, edge = hw + NA * AW;
-  const AH = R.arcade_height, GH = R.gallery_height, CH = R.clerestory_height;
+  const AH = R.arcade_height, GH = hall ? 0 : R.gallery_height, CH = R.clerestory_height;
   const lean = n => (n - 1) >> 1;                       // rise of a lean-to roof n cells deep (half a block per cell)
   const IT = AH + GH, OT = AH;                          // wall tops of the inner aisle (with its gallery) and the outer aisle
   const IRT = IT + 1 + lean(AW);                        // top of the inner aisle roof where it meets the nave wall
-  const NT = IRT + CH;                                  // nave wall top
+  const NT = hall ? AH + CH : IRT + CH;                 // nave wall top (a hall: the outer walls rise as high)
+  const RW = hall ? edge : hw;                          // half-width under the main roof
   const PR = ROOF_PITCHES[p.roof_pitch] || ROOF_PITCHES.medium, pitch = PR.r;
-  const ridge = NT + 1 + Math.round(pitch * hw);
+  const ridge = NT + 1 + Math.round(pitch * RW);
   const FT = ridge + R.facade_extra;
   const detailed = (p.facade || 'detailed') !== 'simple', screen = p.facade === 'screen', terrace = p.roof_style === 'terrace';
   const towers = !screen && p.tower_top !== 'none';
   const GL = detailed && !screen ? gothicFrontLayout({ hw, edge: hw + NA * AW, NT, ridge, TT: FT + R.tower_rise }) : null;
   const TT = GL ? GL.top : FT + R.tower_rise;
-  const hasT = !!p.transept, tdep = hasT ? R.transept_depth : 0;
+  const hasT = greek || !!p.transept, tdep = !hasT ? 0 : greek ? Math.max(R.transept_depth, CB * bay - NA * AW) : R.transept_depth;
+  if (greek) report.push(`希腊十字：中殿 ${NB} 开间（跟唱诗堂一样），耳堂每臂伸出 ${NA * AW + tdep} 格，四臂等长`);
+  if (hall) report.push(`厅堂式：侧廊与中殿同高 ${NT}，一整片屋顶（宽 ${2 * edge + 1}），没有高侧窗和飞扶壁`);
   const xN = NB * bay - 1, xc0 = hasT ? xN + 1 : 0, xc1 = hasT ? xN + W : -1, xcm = xc0 + hw;
   const xE = (hasT ? xc1 : xN) + CB * bay;
   const east = CATHEDRAL_EAST[p.east_end] ? p.east_end : 'chevet';
@@ -109,7 +116,7 @@ function _cathedral(o) {
     if (x < 0) return 0;
     if (x <= xE) {
       if (towers && x < TL && az > hw && az <= edge) return T;
-      if (az <= hw) return H;
+      if (az <= RW) return H;
       if (hasT && x >= xc0 && x <= xc1 && az <= edge + tdep) return H;
       if (az <= hw + AW) return I;
       if (az <= edge) return O;
@@ -117,7 +124,7 @@ function _cathedral(o) {
     }
     if (east === 'flat') return 0;
     const r = Math.hypot(x - xE, z);
-    if (r <= hw + 0.5) return H;
+    if (r <= RW + 0.5) return H;
     if (east === 'apse') return 0;
     if (r <= hw + AW + 0.5) return I;
     if (NA === 2 && r <= edge + 0.5) return O;
@@ -165,15 +172,22 @@ function _cathedral(o) {
       }
     }
   }
+  if (hall) for (let xb = bay; xb <= xE; xb += bay) {   // a hall: slender piers in rows where the aisles meet (no steps in the walls to make arcades from)
+    if (xb < TL + 1 || (hasT && xb >= xc0 - 1 && xb <= xc1 + 1)) continue;
+    for (const zr of NA === 2 ? [hw, hw + AW] : [hw]) for (const s of [-1, 1]) {
+      const z = s * zr; if (zone(xb, z) !== H || border.has(xb + ',' + z)) continue;
+      for (let y = 1; y <= NT; y++) S.set(xb, y, z, B(SM.block));
+    }
+  }
   if (GH > 0) for (const [x, z] of cells) if (zone(x, z) === I && !border.has(x + ',' + z)) S.set(x, AH, z, B(WD.planks));   // tribune floor
 
   // ---- roofs ----
   const RH = new Map();                                 // roof surface per cell, for the flyers' clearance
   const dH = (x, z) => {
     let d = 0; const az = Math.abs(z);
-    if (x <= xE && az <= hw) d = hw + 1 - az;
+    if (x <= xE && az <= RW) d = RW + 1 - az;
     if (hasT && x >= xc0 && x <= xc1) d = Math.max(d, hw + 1 - Math.abs(x - xcm));
-    if (x > xE) d = Math.max(d, Math.min(hw + 1, Math.round(hw + 1.5 - Math.hypot(x - xE, z))));
+    if (x > xE) d = Math.max(d, Math.min(RW + 1, Math.round(RW + 1.5 - Math.hypot(x - xE, z))));
     return Math.max(1, d);
   };
   const hH = (x, z) => NT + 1 + Math.round(pitch * (dH(x, z) - 1));
@@ -319,7 +333,8 @@ function _cathedral(o) {
   const inCross = x => hasT && x >= xc0 - 1 && x <= xc1 + 1;
   const bayMids = []; for (let k = 0; k * bay + (bay >> 1) < xE; k++) { const xm = k * bay + (bay >> 1); if (xm > TL + 1 && !inCross(xm)) bayMids.push(xm); }
   for (const s of [-1, 1]) for (const xm of bayMids) {
-    lancet(xm, s * edge, true, 2, (NA === 2 ? OT : IT) - 2);                                     // aisle wall
+    lancet(xm, s * edge, true, 2, hall ? NT - 3 : (NA === 2 ? OT : IT) - 2);                     // aisle wall (a hall: the full height)
+    if (hall) continue;
     if (NA === 2 && GH > 0) lancet(xm, s * (hw + AW), true, OT + 2 + lean(AW), IT - 1, false);     // tribune, above the outer aisle roof
     lancet(xm, s * hw, true, IRT + 2, NT - 2);                                                    // clerestory
   }
@@ -335,7 +350,7 @@ function _cathedral(o) {
   // east end: lights round the apse above the ambulatory roof (or low down without one); chapel windows
   for (const [x, z] of cells) {
     if (x <= xE || zone(x, z) !== H || !border.has(x + ',' + z) || (x + z) & 1) continue;
-    const ax = Math.abs(z) > x - xE ? 'x' : 'z', y0 = east === 'chevet' ? IRT + 2 : 2;
+    const ax = Math.abs(z) > x - xE ? 'x' : 'z', y0 = east === 'chevet' && !hall ? IRT + 2 : 2;
     let ok = true; for (let y = y0; y <= NT - 1; y++) if (!isWall(S.get(x, y, z))) ok = false;
     if (ok) { for (let y = y0; y <= NT - 2; y++) S.set(x, y, z, pane(x, y, z, ax)); nw++; }
   }
@@ -350,7 +365,7 @@ function _cathedral(o) {
 
   // ---- flying buttresses: a pier with a pinnacle outside the aisles, an arch of stone up to the clerestory ----
   let nf = 0, nf2 = 0; const FLY = [];
-  if (p.flying_buttresses && !detailed) {   // the detailed cathedral draws its flyers with gothicFlyer (after the walls)
+  if (p.flying_buttresses && !detailed && !hall) {   // the detailed cathedral draws its flyers with gothicFlyer (after the walls)
     const yp = Math.max(IRT, OT + 1 + lean(AW)) + 2, yw = NT - 2;
     for (let xb = 0; xb <= xE; xb += bay) {
       if (xb < TL + 1 || inCross(xb)) continue;
@@ -465,20 +480,20 @@ function _cathedral(o) {
     }
     if (!screen && TL >= 8) for (const s of [-1, 1]) { const r = gothicTowerSide(S, GL, fo, s, edge, 4, TL - 1, GF.mine); st += r.statues; pn += r.pins; }
     // aisle walls of the nave and the choir, and the transept fronts below their roses
-    const vSide = NA === 2 ? OT : IT, eastX = east === 'flat' ? xE : xE - 1;
+    const vSide = hall ? NT : NA === 2 ? OT : IT, eastX = east === 'flat' ? xE : xE - 1;
     for (const s of [-1, 1]) {
       gothicSideWall(S, fo, s, edge, TL + 1, hasT ? xc0 - 2 : eastX, bay, vSide, GF.mine);
       if (hasT && xc1 + 2 < eastX) gothicSideWall(S, fo, s, edge, xc1 + 2, eastX, bay, vSide, GF.mine);
       if (hasT && tdep >= 0) { const r = gothicTransept(S, { ...fo, bigWindow: !p.rose }, s, edge + tdep, xc0, xc1, p.rose ? Math.max(8, NT - 2 * Math.max(2, Math.min(4, hw - 1)) - 9) : NT, GF.mine, NT, ridge); st += r.statues;
-        if (tdep >= 1) for (const [sx, xf] of [[-1, xc0], [1, xc1]]) gothicShortWall(S, fo, sx, xf, s * (edge + 1), s * (edge + tdep - 1), vSide, GF.mine); }
+        if (tdep >= 1) for (const [sx, xf] of [[-1, xc0], [1, xc1]]) gothicShortWall(S, fo, sx, xf, s * (edge + 1), s * (edge + tdep - 1), greek ? NT : vSide, GF.mine, greek ? bay : 0); }   // a Greek cross's long arms: full-height walls with a window per bay
     }
     // clerestory: piers where the flyers land, a lancet per bay (no clearing: the flyers and aisle roofs are in front)
     const fc = { ...fo, clear: false };
-    for (const s of [-1, 1]) {
+    if (!hall) for (const s of [-1, 1]) {
       gothicSideWall(S, fc, s, hw, TL + 1, hasT ? xc0 - 2 : xE, bay, NT, GF.mine, IRT + 1);
       if (hasT && xc1 + 2 < xE) gothicSideWall(S, fc, s, hw, xc1 + 2, xE, bay, NT, GF.mine, IRT + 1);
     }
-    if (p.flying_buttresses) {
+    if (p.flying_buttresses && !hall) {
       const yp = Math.max(IRT, OT + 1 + lean(AW)) + 2, yw = NT - 2, fl = { ...fo, plinth: WM.plinth, pinnacles: true, flyerLevels: R.flyer_levels, wallLow: IRT };
       for (let xb = 0; xb <= xE; xb += bay) {
         if (xb < TL + 1 || inCross(xb)) continue;
@@ -487,7 +502,7 @@ function _cathedral(o) {
     }
     // east end: a stepped pier with a pinnacle between every two radiating chapels (or round the apse)
     if (east !== 'flat') {
-      const rOut = east === 'chevet' ? (NA === 2 ? edge : hw + AW) : hw, nP = east === 'chevet' ? Math.max(2, nch + 1) : 5, top = east === 'chevet' ? (NA === 2 ? OT : IT) : NT;
+      const rOut = hall ? edge : east === 'chevet' ? (NA === 2 ? edge : hw + AW) : hw, nP = east === 'chevet' ? Math.max(2, nch + 1) : 5, top = hall ? NT : east === 'chevet' ? (NA === 2 ? OT : IT) : NT;
       for (let k = 0; k < nP; k++) {
         const a = -Math.PI / 2 + Math.PI * k / (nP - 1);
         for (const rr of [rOut + 1, rOut + 2]) {
@@ -498,7 +513,7 @@ function _cathedral(o) {
           if (rr === rOut + 2) { gothicPinnacleAt(S, fo, x, h + 1, z, 2, false, GF.mine); pn++; }
           else { gothicPinnacleAt(S, fo, x, h + 1, z, 3, true, GF.mine); pn++; }
         }
-        if (east !== 'chevet' || !p.flying_buttresses) continue;
+        if (east !== 'chevet' || !p.flying_buttresses || hall) continue;
         // a flyer from the inner pier up to the apse's high wall, and a pilaster on that wall where it lands
         const y0 = top + 1, y1 = NT - 2; let py = null, pxz = null;
         for (let rr = rOut; rr >= hw + 1; rr--) {
@@ -550,6 +565,6 @@ function _cathedral(o) {
     (hasT ? `；耳堂伸出侧廊外 ${tdep} 格` : '') + `；唱诗堂 ${CB} 开间；东端${CATHEDRAL_EAST[east]}` + (nch ? `（${nch} 个小礼拜堂）` : '') +
     `；剖面：拱廊 ${AH}` + (GH ? ` + 楼廊 ${GH}` : '') + ` + 高侧窗 ${CH}，中殿墙高 ${NT}、屋脊 ${ridge}；西立面高 ${FT}，双塔高 ${TT}` + (fTop ? `，交叉处尖塔顶 ${fTop}` : '') +
     `；窗 ${nw} 扇、玫瑰窗 ${roses} 扇、飞扶壁 ${nf} 道` + (nf2 ? `（其中 ${nf2} 道双层）` : '') + (ndorm ? `、老虎窗 ${ndorm} 个` : '') + `；总尺寸 ${bx1 - bx0 + 1}×${bz1 - bz0 + 1}，高 ${by1 + 1}` + (p.interior ? '；内部有祭坛、唱诗席' : ''));
-  const spec = { ...p, ...R, arch: p.arch === 'round' ? 'round' : 'pointed', facade: detailed ? 'detailed' : 'simple', width: W, aisles: NA, east_end: east, chapels: nch || R.chapels };
+  const spec = { ...p, ...R, plan, arch: p.arch === 'round' ? 'round' : 'pointed', facade: detailed ? 'detailed' : 'simple', width: W, aisles: NA, east_end: east, chapels: nch || R.chapels };
   return { S, foot: [bx0, bx1, bz0, bz1], tags: ['landmark', 'cathedral'], report, spec, adjust };
 }
