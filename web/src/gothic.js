@@ -174,6 +174,16 @@ function gothicKit(S, o, W, dir, ax, mine) {
     for (let v = v0; v <= AT(wo, hs); v++) for (let du = -(wo >> 1); du <= wo >> 1; du++) for (let k = 0; k <= ob; k++) if (IN(du, v, wo - 2 * k, v0, hs) && !skip(uc + du)) setD(uc + du, v, -1 - k, 'frame');
     for (let v = v0 + 1; v <= AT(wb, hs); v++) for (let du = -(wb >> 1); du <= wb >> 1; du++) if (IN(du, v, wb, v0 + 1, hs) && (du !== 0 || wb < 5)) HOLE.set(k2(uc + du, v), 'void');
   };
+  // Lombard band (Romanesque): a row of small round arches on corbels just under the cornice, one block proud of the
+  // wall: every third cell a corbel, between them two upside-down stairs whose open corners meet (a little arch)
+  K.lombard = (us, v, skip = () => false) => {
+    if (o.lombard === false) return;
+    for (const u of us) {
+      const d = getD(u, v); if (d === undefined || skip(u) || HOLE.has(k2(u, v)) || getD(u, v - 1) === undefined) continue;
+      const m = ((u % 3) + 3) % 3;
+      ATT.push(() => put(u, v, d + 1, m === 0 ? B(o.frame) : st(FST, m === 1 ? dir.un : dir.up, 'top')));
+    }
+  };
   K.panels = (us, v0, v1, skip) => {               // blind tracery: narrow recessed upright strips on plain wall, a band every 9 rows
     for (let v = v0; v <= v1; v++) for (const u of us) {
       if (skip(u) || (v - v0) % 9 === 0 || ((u % 2) + 2) % 2) continue;
@@ -327,8 +337,9 @@ function gothicSideWall(S, o, s, zf, x0, x1, bay, vTop, mine, vBase = 0) {   // 
   }
   if (o.forest && !vBase) K.panels(us, sill, vTop - 1, u => pier(u) || shoulder(u));
   K.fill();
-  const rows = [vBase + 2, vTop]; rows.parapet = [vTop];
+  const rows = [vBase + 2, vTop]; rows.parapet = o.lombard ? [] : [vTop];   // Romanesque eaves: no parapet, the Lombard band under the cornice instead
   K.courses(rows, us, u => pier(u));
+  if (o.lombard) K.lombard(us, vTop - 1, u => pier(u) || shoulder(u));
   for (const f of ATT) f();
   if (vBase) for (const u of us) if (pier(u)) K.pinnacle(u, vTop + 1, 1, 2, false);   // eaves pinnacles over the flyers' landings
   if (o.forest) for (const u of us) if (shoulder(u) && us.includes(u)) K.pinnacle(u, vTop + 1, vBase ? 0 : 1, vBase ? 2 : 3, false);   // pinnacle forest: one more on each side of every pier
@@ -353,6 +364,7 @@ function gothicTransept(S, o, s, zf, x0, x1, vTop, mine, wallTop = vTop, apex = 
   K.fill();
   const rows = [vb, vTop]; rows.parapet = [];
   K.courses(rows, us, u => isBut(0, u));
+  if (o.lombard) K.lombard(us, vTop - 1, u => isBut(0, u));
   for (const f of K.ATT) f();
   for (const u of [x0, x1]) { K.pinnacle(u + (u === x0 ? 1 : -1), vTop + 1, 3, 2, false); K.pinnacle(u + (u === x0 ? 1 : -1), wallTop + 1, 1, 4, true); }
   if (apex) K.pinnacle(xm, apex + 1, 0, 3, false);   // a slim finial: the gable's peak is a single block wide
@@ -374,8 +386,9 @@ function gothicShortWall(S, o, sx, xf, z0, z1, vTop, mine, bay = 0) {   // bay >
     if (hs - 3 >= 4) for (let um = lo + (bay >> 1); um + (w >> 1) + 1 <= hi; um += bay) if (um - (w >> 1) - 1 >= lo) K.lancet(um, w, 3, hs, 1, 0, vTop - 1);
   }
   K.fill();
-  const rows = [2, vTop]; rows.parapet = [vTop];
+  const rows = [2, vTop]; rows.parapet = o.lombard ? [] : [vTop];
   K.courses(rows, us, () => false);
+  if (o.lombard) K.lombard(us, vTop - 1);
   for (const f of K.ATT) f();
 }
 // a flying buttress (single): a pier outside the aisle wall, 3 wide, stepping in twice, crowned by a pinnacle of the
