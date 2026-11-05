@@ -10,13 +10,20 @@
 // nave / aisle width gives a consistent front; parts that do not fit shrink (fewer arch orders) or drop.
 // gothicFrontLayout(...) runs first so the cathedral can raise its towers to the facade's tower top.
 // ---------------------------------------------------------------------------------------------
-function gothicArchIn(du, v, w, v0, hs) {           // inside a pointed (equilateral) arch: width w, springing at hs
+// arch shape for the whole building being generated: 'pointed' (Gothic, equilateral) or 'round' (Romanesque, a half
+// circle). The cathedral sets it before building and puts it back afterwards (gothicWithArch), so every part — doors,
+// windows, belfries, the facade's storey heights — follows it without passing it through each call.
+let _gothicArch = 'pointed';
+function gothicWithArch(shape, f) { const old = _gothicArch; _gothicArch = shape === 'round' ? 'round' : 'pointed'; try { return f(); } finally { _gothicArch = old; } }
+const _gothicRoundR2 = a => a >= 2.5 ? a * a - 0.25 : (a - 0.5) * (a - 0.5) + 0.6;   // half-circle radius² for a half-width a: wide arches get a flat 3-block crown (reads round, not pointed)
+function gothicArchIn(du, v, w, v0, hs) {           // inside the arch: width w, springing at hs
   const a = w / 2, x = Math.abs(du);
   if (x > a - 0.5 || v < v0) return false;
   if (v <= hs) return true;
+  if (_gothicArch === 'round') return (v - hs) * (v - hs) + x * x <= _gothicRoundR2(a);
   return v + 0.5 <= hs + Math.sqrt(Math.max(0, w * w - (x + a) * (x + a))) + 0.35;
 }
-const gothicArchTop = (w, hs) => hs + Math.floor(Math.sqrt(3) * w / 2);
+const gothicArchTop = (w, hs) => hs + (_gothicArch === 'round' ? Math.max(0, Math.floor(Math.sqrt(_gothicRoundR2(w / 2)))) : Math.floor(Math.sqrt(3) * w / 2));
 // facade materials per wall style (frame, stairs, slab, wall post, statue head, capital, niche back)
 const GOTHIC_FACADE_MATS = {
   white: { frame: 'polished_diorite', stairs: 'polished_diorite_stairs', slab: 'polished_diorite_slab', wall: 'diorite_wall', head: 'calcite', capital: 'chiseled_stone_bricks', niche: 'smooth_stone' },
@@ -113,20 +120,32 @@ function gothicKit(S, o, W, dir, ax, mine) {
     for (let v = v0; v <= AT(iw, hs); v++) for (let du = -ia; du <= ia; du++) {
       if (!IN(du, v, iw, v0, hs)) continue;
       const two = ia >= 2, sub = du < 0 ? -1 : 1, sd = du - sub * (ia + 1) / 2;
-      const inSub = two ? (ia >= 4 ? du !== 0 && IN(sd, v, ia, v0 + 1, hs - 3) : v >= v0 + 1 && (du !== 0 || v > hs + ia)) : v <= hs;   // with no room for an oculus: Y-tracery, one mullion that stops below the head
-      const rr = Math.hypot(du, v - (hs + 4)), oc = ia >= 4 && rr >= 1.6 && rr <= 3.2;   // an oculus only where a real ring fits (glass ring round a stone hub; smaller ones read as a cross)
+      const round = _gothicArch === 'round';
+      const inSub = round ? (ia >= 4 ? du !== 0 && IN(sd, v, ia, v0 + 1, hs - (ia >> 1)) : true)   // Romanesque: one open round-headed light; a wide one is two lights under a solid tympanum
+        : two ? (ia >= 4 ? du !== 0 && IN(sd, v, ia, v0 + 1, hs - 3) : v >= v0 + 1 && (du !== 0 || v > hs + ia)) : v <= hs;   // with no room for an oculus: Y-tracery, one mullion that stops below the head
+      const rr = Math.hypot(du, v - (hs + 4)), oc = !round && ia >= 4 && rr >= 1.6 && rr <= 3.2;   // an oculus only where a real ring fits (glass ring round a stone hub; smaller ones read as a cross)
       if (inSub || oc) { setD(uc + du, v, dIn - 1, 'glass'); HOLE.set(k2(uc + du, v), 'glass'); }
     }
     const gb = AT(w, hs) - 1, a = w >> 1;
+    if (_gothicArch === 'round') {                     // Romanesque: no gablet; round the head off with upside-down stairs at its shoulders
+      if (ia < 4) ATT.push(() => {
+        const half = v => { let r = -1; for (let du = 0; du <= ia; du++) if (HOLE.get(k2(uc + du, v)) === 'glass') r = du; return r; };
+        for (let v = hs + 1; v <= AT(iw, hs) + 1; v++) {
+          const r = half(v), rp = half(v - 1);
+          for (let k = r + 1; k <= rp; k++) for (const sg of [-1, 1]) { const u = uc + sg * k; if (HOLE.has(k2(u, v))) continue; const d = getD(u, v); if (d !== undefined) put(u, v, d, st(FST, sg < 0 ? dir.un : dir.up, 'top')); }
+        }
+      });
+      return;
+    }
     for (let v = gb; v <= Math.min(gb + a + 2, vMax); v++) for (let du = -a; du <= a; du++) if (v <= gb + a + 2 - Math.round(Math.abs(du) * (a + 2) / a) && (free || getD(uc + du, v) !== undefined) && !HOLE.has(k2(uc + du, v))) setD(uc + du, v, Math.max(getD(uc + du, v) ?? base + 1, base + 1), 'frame');
     if (gb + a + 4 <= vMax) ATT.push(() => { put(uc, gb + a + 3, base + 1, post()); put(uc, gb + a + 4, base + 1, rod()); });
   };
   K.portal = (uc, w, hs, orders, base, isBut, vMax = Infinity) => {   // vMax: the gable and its finial stay below this row
-    const a = w >> 1, top = gothicArchTop(w, hs), gTop = Math.max(top + 1, Math.min(top + a + 6, vMax - 3));
+    const a = w >> 1, top = gothicArchTop(w, hs), gTop = _gothicArch === 'round' ? top + 1 : Math.max(top + 1, Math.min(top + a + 6, vMax - 3));
     for (let v = 0; v <= gTop; v++) for (let du = -a - 1; du <= a + 1; du++) {
       const u = uc + du, au = Math.abs(du);
       if (isBut(Math.abs(u), u)) continue;
-      const inGable = v >= hs && v <= gTop - Math.round(au * (gTop - hs) / (a + 1));
+      const inGable = _gothicArch !== 'round' && v >= hs && v <= gTop - Math.round(au * (gTop - hs) / (a + 1));
       if (gothicArchIn(du, v, w + 2, 0, hs) || inGable) setD(u, v, base, 'frame', inGable && v > top);
       for (let k = 0; k <= orders; k++) if (gothicArchIn(du, v, w - 2 * k, 0, hs)) setD(u, v, base - 1 - k, k === orders ? 'infill' : 'frame');
     }
@@ -141,6 +160,7 @@ function gothicKit(S, o, W, dir, ax, mine) {
         for (let v = 1; v < hs - 1; v++) put(u, v, d, post());
         put(u, hs - 1, d, B(o.capital)); if (k % 2 === 0 && hs > 6) put(u, 5, d, B(o.head));
       }
+      if (_gothicArch === 'round') return;                              // Romanesque: no gable
       for (let du = -a - 1; du <= a + 1; du++) {                        // crockets up the gable, finial on top
         const au = Math.abs(du), v = gTop - Math.round(au * (gTop - hs) / (a + 1));
         if (au % 2 === 1 && au <= a) put(uc + du, v + 1, base, st(FST, du < 0 ? dir.up : dir.un));
@@ -153,6 +173,16 @@ function gothicKit(S, o, W, dir, ax, mine) {
     const IN = gothicArchIn, AT = gothicArchTop, wo = wb + 2 * ob;
     for (let v = v0; v <= AT(wo, hs); v++) for (let du = -(wo >> 1); du <= wo >> 1; du++) for (let k = 0; k <= ob; k++) if (IN(du, v, wo - 2 * k, v0, hs) && !skip(uc + du)) setD(uc + du, v, -1 - k, 'frame');
     for (let v = v0 + 1; v <= AT(wb, hs); v++) for (let du = -(wb >> 1); du <= wb >> 1; du++) if (IN(du, v, wb, v0 + 1, hs) && (du !== 0 || wb < 5)) HOLE.set(k2(uc + du, v), 'void');
+  };
+  // Lombard band (Romanesque): a row of small round arches on corbels just under the cornice, one block proud of the
+  // wall: every third cell a corbel, between them two upside-down stairs whose open corners meet (a little arch)
+  K.lombard = (us, v, skip = () => false) => {
+    if (o.lombard === false) return;
+    for (const u of us) {
+      const d = getD(u, v); if (d === undefined || skip(u) || HOLE.has(k2(u, v)) || getD(u, v - 1) === undefined) continue;
+      const m = ((u % 3) + 3) % 3;
+      ATT.push(() => put(u, v, d + 1, m === 0 ? B(o.frame) : st(FST, m === 1 ? dir.un : dir.up, 'top')));
+    }
   };
   K.panels = (us, v0, v1, skip) => {               // blind tracery: narrow recessed upright strips on plain wall, a band every 9 rows
     for (let v = v0; v <= v1; v++) for (const u of us) {
@@ -307,8 +337,9 @@ function gothicSideWall(S, o, s, zf, x0, x1, bay, vTop, mine, vBase = 0) {   // 
   }
   if (o.forest && !vBase) K.panels(us, sill, vTop - 1, u => pier(u) || shoulder(u));
   K.fill();
-  const rows = [vBase + 2, vTop]; rows.parapet = [vTop];
+  const rows = [vBase + 2, vTop]; rows.parapet = o.lombard ? [] : [vTop];   // Romanesque eaves: no parapet, the Lombard band under the cornice instead
   K.courses(rows, us, u => pier(u));
+  if (o.lombard) K.lombard(us, vTop - 1, u => pier(u) || shoulder(u));
   for (const f of ATT) f();
   if (vBase) for (const u of us) if (pier(u)) K.pinnacle(u, vTop + 1, 1, 2, false);   // eaves pinnacles over the flyers' landings
   if (o.forest) for (const u of us) if (shoulder(u) && us.includes(u)) K.pinnacle(u, vTop + 1, vBase ? 0 : 1, vBase ? 2 : 3, false);   // pinnacle forest: one more on each side of every pier
@@ -333,6 +364,7 @@ function gothicTransept(S, o, s, zf, x0, x1, vTop, mine, wallTop = vTop, apex = 
   K.fill();
   const rows = [vb, vTop]; rows.parapet = [];
   K.courses(rows, us, u => isBut(0, u));
+  if (o.lombard) K.lombard(us, vTop - 1, u => isBut(0, u));
   for (const f of K.ATT) f();
   for (const u of [x0, x1]) { K.pinnacle(u + (u === x0 ? 1 : -1), vTop + 1, 3, 2, false); K.pinnacle(u + (u === x0 ? 1 : -1), wallTop + 1, 1, 4, true); }
   if (apex) K.pinnacle(xm, apex + 1, 0, 3, false);   // a slim finial: the gable's peak is a single block wide
@@ -344,14 +376,20 @@ function gothicPinnacleAt(S, o, x, y, z, h, big, mine) {
   K.pinnacle(z, y, -x, h, big);
 }
 // a short plain wall (transept east / west sides): plinth, sill course, cornice with an open parapet. Face plane x = xf.
-function gothicShortWall(S, o, sx, xf, z0, z1, vTop, mine) {
+function gothicShortWall(S, o, sx, xf, z0, z1, vTop, mine, bay = 0) {   // bay > 0: a window in every bay (long walls)
   const dir = sx < 0 ? { in: 'east', out: 'west', un: 'north', up: 'south' } : { in: 'west', out: 'east', un: 'north', up: 'south' };
   const K = gothicKit(S, { ...o, thick: 1, backMax: -1 }, (u, v, d) => [xf + sx * d, v, u], dir, 'z', mine);
   const us = []; for (let u = Math.min(z0, z1); u <= Math.max(z0, z1); u++) us.push(u);
   for (let v = 0; v <= vTop; v++) for (const u of us) K.setD(u, v, v <= 1 ? 1 : 0, v <= 1 ? 'frame' : 'infill');
+  if (bay >= 6) {
+    const w = 5, hs = vTop - 4 - gothicArchTop(w, 0), lo = us[0], hi = us[us.length - 1];
+    if (hs - 3 >= 4) for (let um = lo + (bay >> 1); um + (w >> 1) + 1 <= hi; um += bay) if (um - (w >> 1) - 1 >= lo) K.lancet(um, w, 3, hs, 1, 0, vTop - 1);
+  }
   K.fill();
-  const rows = [2, vTop]; rows.parapet = [vTop];
+  const rows = [2, vTop]; rows.parapet = o.lombard ? [] : [vTop];
   K.courses(rows, us, () => false);
+  if (o.lombard) K.lombard(us, vTop - 1);
+  for (const f of K.ATT) f();
 }
 // a flying buttress (single): a pier outside the aisle wall, 3 wide, stepping in twice, crowned by a pinnacle of the
 // pier's own width; an arch whose top is a straight sloping coping and whose underside is a curve, thick at the pier and
@@ -407,10 +445,5 @@ function gothicFlyer(S, o, s, xb, z0, yp, zw, yw, RH, mine, zMid = null) {   // 
     }
     if (cols.length) levels = 2;
   }
-  if (o.gargoyles) {                             // a spout out of the top stage of the pier, under the pinnacle
-    const yg = yp - 1;
-    put(xb, yg, s * (z0 + 4), st(o.stairs, IN, 'top'));
-    put(xb, yg, s * (z0 + 5), B(o.head || o.frame));
-  }
-  return { levels, gargoyles: o.gargoyles ? 1 : 0 };
+  return { levels };
 }
