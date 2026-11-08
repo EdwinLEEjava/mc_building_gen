@@ -538,10 +538,11 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
     <div class="sec gen ctype" data-ctype="cathedral" hidden>
       <span class="sec-title">地标 · 主教座堂</span>
       <div class="grid">
-        <label class="f">风格<select id="c_cd_style"><option value="french" selected>法式（兰斯 / 巴黎圣母院）</option><option value="german">德式（科隆）</option><option value="italian">意式（米兰）</option><option value="spanish">西班牙（塞维利亚）</option><option value="english">英式（索尔兹伯里 / 林肯）</option><option value="romanesque">罗马式（施派尔 / 沃尔姆斯）</option></select></label>
+        <label class="f">风格<select id="c_cd_style"><option value="french" selected>法式（兰斯 / 巴黎圣母院）</option><option value="german">德式（科隆）</option><option value="italian">意式（米兰）</option><option value="spanish">西班牙（塞维利亚）</option><option value="english">英式（索尔兹伯里 / 林肯）</option><option value="romanesque">罗马式（施派尔 / 沃尔姆斯）</option><option value="brick_gothic">砖砌哥特式</option><option value="byzantine">拜占庭式</option></select></label>
         <label class="f">拱形<select id="c_cd_arch"><option value="pointed" selected>尖拱（哥特）</option><option value="round">圆拱（罗马式）</option></select></label>
         <label class="f">西立面<select id="c_cd_facade"><option value="detailed" selected>精细双塔立面</option><option value="single">单塔立面（西面堡 / 乌尔姆）</option><option value="screen">屏风立面（无塔）</option><option value="simple">简单（旧版平立面）</option></select></label>
         <label class="f">塔顶<select id="c_cd_tower_top"><option value="flat" selected>平顶 + 尖塔群（兰斯）</option><option value="openwork">镂空尖塔（科隆）</option><option value="none">无塔</option></select></label>
+        <label class="f">砖砌塔顶<select id="c_cd_brick_tower_top"><option value="solid" selected>实心双尖顶（默认）</option><option value="flat">平顶（不加大型尖顶）</option><option value="openwork">镂空双尖顶</option><option value="none">无双塔</option></select></label>
         <label class="f">交叉处<select id="c_cd_crossing"><option value="fleche" selected>细尖塔（巴黎）</option><option value="octagon">八角塔 + 八角尖顶（施派尔）</option><option value="tower">方形交叉塔（罗马式 / 英式）</option><option value="tower_spire">方形交叉塔 + 石尖塔（索尔兹伯里）</option><option value="turret">铜绿小尖塔（科隆）</option><option value="lantern">八角采光塔 + 金像（米兰）</option><option value="cimborio">方形采光塔（塞维利亚）</option><option value="none">无</option></select></label>
         <label class="f">东端塔<select id="c_cd_east_towers"><option value="none" selected>无</option><option value="pair">唱诗堂两侧一对塔（施派尔）</option></select></label>
         <label class="f">单塔 / 东塔屋顶<select id="c_cd_tower_roof"><option value="spire" selected>石尖塔</option><option value="helm">莱茵式菱形屋顶</option><option value="pyramid">四坡尖顶</option><option value="flat">平顶 + 栏杆</option></select></label>
@@ -551,7 +552,13 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
         <label class="ck"><input type="checkbox" id="c_cd_campanile">独立钟楼（吉拉尔达式）</label>
         <label class="ck"><input type="checkbox" id="c_cd_court">橘树庭院</label>
         <label class="f">比例（一键套用尺寸）<select id="c_cd_scale"><option value="0.6">0.6</option><option value="0.7">0.7</option><option value="0.8">0.8</option><option value="1" selected>1.0（默认，约等于真实米数）</option><option value="1.2">1.2</option></select></label>
-        <label class="f">平面类型<select id="c_cd_plan"><option value="latin" selected>拉丁十字</option><option value="greek">希腊十字（四臂等长）</option><option value="hall">厅堂式（侧廊与中殿等高）</option></select></label>
+        <label class="f">平面类型<select id="c_cd_plan"><option value="central">集中式穹顶平面</option><option value="latin" selected>拉丁十字</option><option value="greek">希腊十字（四臂等长）</option><option value="hall">厅堂式（侧廊与中殿等高）</option></select></label>
+        <label class="f">穹顶半径<input type="number" id="c_cd_dome_radius" min="11" max="23" value="17"></label>
+        <label class="f">穹顶高度<input type="number" id="c_cd_dome_height" min="8" max="18" value="12"></label>
+        <label class="f">鼓座高度<input type="number" id="c_cd_drum_height" min="5" max="10" value="7"></label>
+        <label class="f">主体墙高<input type="number" id="c_cd_body_height" min="18" max="30" value="23"></label>
+        <label class="ck"><input type="checkbox" id="c_cd_small_domes" checked>四座侧廊小穹顶</label>
+        <label class="ck"><input type="checkbox" id="c_cd_stepped_gables" checked>阶梯山墙与盲拱</label>
         <label class="f">中殿开间数<input type="number" id="c_cd_nave_bays" min="3" max="14" value="9"></label>
         <label class="f">开间长<input type="number" id="c_cd_bay" min="4" max="10" value="8"></label>
         <label class="f">中殿宽（奇数）<input type="number" id="c_cd_width" min="7" max="21" step=2 value="17"></label>
@@ -580,7 +587,7 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
         <label class="ck"><input type="checkbox" id="c_cd_fleche" checked>交叉处尖塔</label>
         <label class="f">交叉处尖塔高<input type="number" id="c_cd_fleche_height" min="10" max="90" value="50"></label>
         <label class="f">屋顶坡度<select id="c_cd_roof_pitch"><option value="normal">标准（45°）</option><option value="medium" selected>中陡</option><option value="steep">陡</option><option value="very_steep">很陡</option></select></label>
-        <label class="f">墙体<select id="c_cd_walls"><option value="white" selected>白石（方解石）</option><option value="stone">石砖</option><option value="sandstone">砂岩</option><option value="rough">毛石</option><option value="dark">深板岩</option><option value="warm">暖黄砂岩（兰斯、科隆）</option><option value="marble">白大理石（米兰）</option></select></label>
+        <label class="f">墙体<select id="c_cd_walls"><option value="brick">红砖</option><option value="white" selected>白石（方解石）</option><option value="stone">石砖</option><option value="sandstone">砂岩</option><option value="rough">毛石</option><option value="dark">深板岩</option><option value="warm">暖黄砂岩（兰斯、科隆）</option><option value="marble">白大理石（米兰）</option></select></label>
         <label class="f">屋顶<select id="c_cd_roof"><option value="slate" selected>深色石板</option><option value="stone">石瓦</option><option value="copper">氧化铜</option><option value="dark_oak">深色橡木瓦</option><option value="spruce">云杉木瓦</option></select></label>
         <label class="f">玻璃<select id="c_cd_glass"><option value="colored" selected>彩色玻璃</option><option value="blue">蓝色调</option><option value="amber">琥珀色调</option><option value="clear">透明玻璃</option></select></label>
         <label class="ck"><input type="checkbox" id="c_cd_interior">内部陈设（祭坛、唱诗席、吊灯）</label>
@@ -2830,9 +2837,10 @@ const PANEL_GROUPS = {
     ['外观与细节', ['c_ch_windows', 'c_ch_window_frame', 'c_ch_rose', 'c_ch_pinnacles', 'c_ch_roof_pitch', 'c_ch_flare']],
     ['材质预设', ['c_ch_walls', 'c_ch_roof', 'c_ch_glass']], ['室内', ['c_ch_interior']]],
   cathedral: [['基本', ['c_cd_style', 'c_cd_arch', 'c_cd_scale', 'c_cd_seed']],
+    ['风格特色', ['c_cd_dome_radius', 'c_cd_dome_height', 'c_cd_drum_height', 'c_cd_body_height', 'c_cd_small_domes', 'c_cd_stepped_gables']],
     ['平面', ['c_cd_plan', 'c_cd_nave_bays', 'c_cd_bay', 'c_cd_width', 'c_cd_aisles', 'c_cd_aisle_width', 'c_cd_transept', 'c_cd_transept_depth', 'c_cd_choir_bays', 'c_cd_east_end', 'c_cd_chapels', 'c_cd_chapel_depth']],
     ['剖面高度', ['c_cd_arcade_height', 'c_cd_gallery_height', 'c_cd_clerestory_height', 'c_cd_roof_pitch']],
-    ['西立面与塔', ['c_cd_facade', 'c_cd_tower_top', 'c_cd_east_towers', 'c_cd_tower_roof', 'c_cd_crossing', 'c_cd_portal_orders', 'c_cd_statues', 'c_cd_facade_extra', 'c_cd_tower_rise', 'c_cd_rose', 'c_cd_kings', 'c_cd_fleche', 'c_cd_fleche_height']],
+    ['西立面与塔', ['c_cd_facade', 'c_cd_tower_top', 'c_cd_brick_tower_top', 'c_cd_east_towers', 'c_cd_tower_roof', 'c_cd_crossing', 'c_cd_portal_orders', 'c_cd_statues', 'c_cd_facade_extra', 'c_cd_tower_rise', 'c_cd_rose', 'c_cd_kings', 'c_cd_fleche', 'c_cd_fleche_height']],
     ['结构与装饰', ['c_cd_lombard', 'c_cd_flying_buttresses', 'c_cd_flyer_levels', 'c_cd_louvers', 'c_cd_dormers', 'c_cd_pinnacles', 'c_cd_pinnacle_forest', 'c_cd_roof_style']],
     ['附属', ['c_cd_campanile', 'c_cd_court']],
     ['材质预设', ['c_cd_walls', 'c_cd_roof', 'c_cd_glass']], ['室内', ['c_cd_interior']]],
@@ -2872,8 +2880,10 @@ document.addEventListener('change', e => {   // 风格: copy the style's startin
 }, true);
 document.addEventListener('change', e => {
   if (!e.target || e.target.id !== 'c_cd_scale' || !MCGen.CATHEDRAL_BASE) return;
+  if (val('c_cd_style') === 'byzantine') return;
   const k = +e.target.value;
-  for (const [f, v] of Object.entries(MCGen.CATHEDRAL_BASE)) { const el = $('c_cd_' + f); if (!el) continue; let n = Math.round(v * k); if (f === 'width') n |= 1; el.value = Math.max(+el.min, Math.min(+el.max, n)); }
+  const base = val('c_cd_style') === 'brick_gothic' ? { ...MCGen.CATHEDRAL_BASE, ...Object.fromEntries(Object.keys(MCGen.CATHEDRAL_BASE).map(f => [f, MCGen.CATHEDRAL_PRESETS.brick_gothic[f] ?? MCGen.CATHEDRAL_BASE[f]])) } : MCGen.CATHEDRAL_BASE;
+  for (const [f, v] of Object.entries(base)) { const el = $('c_cd_' + f); if (!el) continue; let n = Math.round(v * k); if (f === 'width') n |= 1; el.value = Math.max(+el.min, Math.min(+el.max, n)); }
 }, true);
 const labelOf = id => { const el = $(id); return el ? el.closest('label') : null; };
 function setLabelText(lab, t) { for (const n of lab.childNodes) if (n.nodeType === 3 && n.textContent.trim()) { n.textContent = t; return; } const sp = lab.querySelector('span'); if (sp) sp.textContent = t; }
@@ -2905,6 +2915,7 @@ function updateDeps() {
     const lab = labelOf(id); if (!lab) continue; let on = true; try { on = !!f(); } catch (e) { }
     lab.classList.toggle('dis', !on); lab.title = on ? '' : '在当前设置下这一项不起作用';
   }
+  syncExtraCathedralDeps();
 }
 // ---- feedback: sizes that could not be built as asked. The generator returns the values it used (spec) and the
 // reasons (adjust: [{ key, got, why }]); anything else that differs is a range clamp. Fields turn orange with a note.
@@ -2969,6 +2980,7 @@ function readMats(type) {
   const box = matPanel(type); if (!box || !box.dataset.ready) return null;
   const out = {};
   box.querySelectorAll('.mrow').forEach(r => {
+    if (type === 'cathedral' && ['brick_gothic', 'byzantine'].includes(val('c_cd_style')) && r.dataset.extraInactive === '1') return;
     const m = r.querySelector('[data-mm]').value;
     if (m === 'color') out[r.dataset.slot] = r.querySelector('[data-mc]').value;
     else if (m === 'block') { const ids = [...r.querySelectorAll('[data-mb]')].map(s => s.value).filter(Boolean); if (ids.length) out[r.dataset.slot] = ids.join(','); }
@@ -2984,8 +2996,11 @@ function compSpec() {
     const o = { type: 'cathedral' };
     for (const k of ['style', 'plan', 'arch', 'facade', 'tower_top', 'east_towers', 'tower_roof', 'crossing', 'roof_style', 'east_end', 'roof_pitch', 'walls', 'roof', 'glass']) o[k] = val('c_cd_' + k);
     for (const k of ['nave_bays', 'bay', 'width', 'aisles', 'aisle_width', 'transept_depth', 'choir_bays', 'chapels', 'chapel_depth', 'arcade_height', 'gallery_height', 'clerestory_height', 'facade_extra', 'tower_rise', 'fleche_height', 'portal_orders', 'flyer_levels', 'seed']) o[k] = +val('c_cd_' + k);
+    if (o.style === 'byzantine') { for (const k of ['dome_radius', 'dome_height', 'drum_height', 'body_height']) o[k] = +val('c_cd_' + k); o.small_domes = val('c_cd_small_domes'); }
+    if (o.style === 'brick_gothic') { o.stepped_gables = val('c_cd_stepped_gables'); o.brick_tower_top = val('c_cd_brick_tower_top'); delete o.tower_top; }
     for (const k of ['transept', 'rose', 'kings', 'statues', 'pinnacle_forest', 'campanile', 'court', 'flying_buttresses', 'lombard', 'louvers', 'dormers', 'pinnacles', 'fleche', 'interior']) o[k] = val('c_cd_' + k);
     const mats = readMats('cathedral'); if (mats) o.mats = mats;
+    if (o.style === 'byzantine') return Object.fromEntries(Object.entries(o).filter(([k]) => ['type','style','walls','roof','glass','seed','dome_radius','dome_height','drum_height','body_height','small_domes','mats'].includes(k)));
     return o;
   }
   if (ctype === 'church') {
@@ -3949,7 +3964,7 @@ function renderSel() {
   if (m === 'comp') {
     if (!SEL || SEL.kind !== 'comp') { g.innerHTML = `<b class="otool">选择</b><span class="ohint">点击${ctype === 'house' ? '房屋' : '组件'}选中它，然后拖手柄或在这里调整大小和朝向</span>`; return; }
     if (ctype !== 'house') {
-      const T = SIZE_AX[ctype] || {}, seen = new Set(); let h = `<b class="otool">选择</b><span class="selname">${(MCGen.PROPS[ctype] || {}).label || ctype}</span><span class="osep"></span>${gmodes()}<span class="osep"></span>`;
+      const T = sizeAxes(ctype) || {}, seen = new Set(); let h = `<b class="otool">选择</b><span class="selname">${(MCGen.PROPS[ctype] || {}).label || ctype}</span><span class="osep"></span>${gmodes()}<span class="osep"></span>`;
       for (const a of Object.values(T)) { if (seen.has(a.f)) continue; seen.add(a.f); h += `${a.lab} ${step('g:' + a.f, axShow(a, axGet(a)))} `; }
       if (seen.size) h += '<span class="osep"></span>';
       if (ctype !== 'tree') h += `<span class="ohint">朝向 ${yawLabel((propRot[ctype] || 0) * 90 + (((MCGen.LANDMARK_PLACE || {})[ctype] || {}).front || 0) * 90)}</span>`;
@@ -3966,7 +3981,7 @@ function renderSel() {
   let h = `<b class="otool">选择</b><span class="selname">${TYPE_CN[it.type]} #${it.id}</span><span class="osep"></span>${gmodes()}<span class="osep"></span>`;
   if (it.type === 'struct') h += `<span class="ohint">${(it.name || '').replace(/</g, '&lt;')}</span><span class="osep"></span>`;
   if (it.type === 'house') h += `宽 ${step('w', it.spec.width)} 深 ${step('d', it.spec.depth)} 层数 ${step('f', it.spec.floors)}<span class="osep"></span>`;
-  if (SIZE_AX[it.type]) { const seen = new Set(); for (const a of Object.values(SIZE_AX[it.type])) { if (seen.has(a.f)) continue; seen.add(a.f); h += `${a.lab} ${step('g:' + a.f, axShow(a, axGet(a)))} `; } h += '<span class="osep"></span>'; }
+  if (sizeAxes(it.type)) { const seen = new Set(); for (const a of Object.values(sizeAxes(it.type))) { if (seen.has(a.f)) continue; seen.add(a.f); h += `${a.lab} ${step('g:' + a.f, axShow(a, axGet(a)))} `; } h += '<span class="osep"></span>'; }
   h += `<button type="button" class="obtn" data-sel="dup">复制 Ctrl+D</button><button type="button" class="obtn" data-sel="del">删除</button>${histBtns()}<span class="ohint">拖坐标轴调整 · 方向键微调 · Ctrl+点击多选</span>`;
   g.innerHTML = h;
 }
@@ -3978,7 +3993,7 @@ $('og_select').addEventListener('click', e => {
   if (a === 'del') { deleteSel(); return; }
   if (a === 'dup') { duplicateSel(); return; }
   pushHist();
-  if (a.startsWith('g:')) { const T = SIZE_AX[selType()], ax = T && Object.values(T).find(x => x.f === a.slice(2)); if (ax) axApply({ [ax.f]: axStep(ax, axGet(ax), v) }); if (curMode() === 'comp') renderSel(); return; }
+  if (a.startsWith('g:')) { const T = sizeAxes(selType()), ax = T && Object.values(T).find(x => x.f === a.slice(2)); if (ax) axApply({ [ax.f]: axStep(ax, axGet(ax), v) }); if (curMode() === 'comp') renderSel(); return; }
   if (curMode() === 'comp') {
     const f = { w: 'g_width', d: 'g_depth', f: 'g_floors' }[a];
     if (f) { const el = $(f); el.value = Math.max(+el.min || 1, Math.min(+el.max || 99, (+el.value || 0) + v)); el.dispatchEvent(new Event('change', { bubbles: true })); el.dispatchEvent(new Event('input', { bubbles: true })); }
@@ -4090,6 +4105,17 @@ const SIZE_AX = {
   green: { x: { f: 'width', id: 'c_gr_width', lab: '宽' }, z: { f: 'length', id: 'c_gr_length', lab: '长' }, y: { f: 'density', id: 'c_gr_density', lab: '浓度 %' } },
 };
 const SIZE_CN = { s: '小', m: '中', l: '大' };
+// New styles select their own editing fields; existing types use the same table.
+function sizeAxes(type) {
+  if (type === 'cathedral') {
+    const component = curMode() === 'comp' && type === ctype, it = component ? null : selItem();
+    const style = component ? val('c_cd_style') : it && it.style;
+    const plan = component ? val('c_cd_plan') : it && (it.plan || (MCGen.CATHEDRAL_PRESETS[it.style] || {}).plan);
+    if (style === 'byzantine') return { x: { f: 'dome_radius', id: 'c_cd_dome_radius', lab: '穹顶半径', per: 2 }, z: { f: 'dome_radius', id: 'c_cd_dome_radius', lab: '穹顶半径', per: 2 }, y: { f: 'body_height', id: 'c_cd_body_height', lab: '主体墙高' } };
+    if (style === 'brick_gothic' && plan === 'greek') return { ...SIZE_AX.cathedral, x: { f: 'choir_bays', id: 'c_cd_choir_bays', lab: '中殿/唱诗堂开间', per: component ? +val('c_cd_bay') || 7 : it.bay || 7 } };
+  }
+  return SIZE_AX[type];
+}
 const propRot = {};                                   // component mode: quarter turns of the previewed prop
 function selType() { return SEL && SEL.kind === 'comp' ? ctype : (selItem() || {}).type; }
 function axEnum(a) { if (a.f !== 'size') return null; return SEL.kind === 'comp' ? [...$(a.id).options].map(o => o.value) : ['s', 'm', 'l']; }
@@ -4104,7 +4130,7 @@ function axClamp(a, v) { const el = $(a.id), mn = +el.min, mx = +el.max, st = +e
 function axStep(a, cur, n) { const E = axEnum(a); if (E) { const i = Math.max(0, E.indexOf(cur)); return E[Math.max(0, Math.min(E.length - 1, i + n))]; } return axClamp(a, cur + n * (+$(a.id).step || 1)); }
 const axShow = (a, v) => axEnum(a) ? (SIZE_CN[v] || ($(a.id).querySelector(`option[value="${v}"]`) || {}).textContent || v) : v;
 function axApply(set) {                              // set: { field: value }
-  if (SEL.kind === 'comp') { const T = SIZE_AX[ctype]; for (const a of Object.values(T)) if (a.f in set) { const el = $(a.id); el.value = set[a.f]; } const el = $(Object.values(T)[0].id); el.dispatchEvent(new Event('change', { bubbles: true })); return; }
+  if (SEL.kind === 'comp') { const T = sizeAxes(ctype); for (const a of Object.values(T)) if (a.f in set) { const el = $(a.id); el.value = set[a.f]; } const el = $(Object.values(T)[0].id); el.dispatchEvent(new Event('change', { bubbles: true })); return; }
   const it = selItem(); Object.assign(it, set); it.manual = true; retouch([it.id], `调整了 ${TYPE_CN[it.type] || it.type} #${it.id}`, it.id);
 }
 // what the selected thing can do
@@ -4112,13 +4138,13 @@ function selCaps() {
   if (!SEL) return null;
   if (SEL.kind === 'comp') {
     if (ctype === 'house') return { scale: { x: 1, y: 1, z: 1 }, rotate: 'diag', move: false };
-    const T = SIZE_AX[ctype] || {}, sw = (propRot[ctype] || 0) % 2;
+    const T = sizeAxes(ctype) || {}, sw = (propRot[ctype] || 0) % 2;
     return { scale: { x: !!T[sw ? 'z' : 'x'], y: !!T.y, z: !!T[sw ? 'x' : 'z'] }, rotate: ctype === 'tree' ? null : 'quarter', move: false };
   }
   if (multi()) return { scale: {}, rotate: null, move: true, lift: selItems().some(i => BIG(i.type)) };
   const it = selItem(); if (!it) return null;
   if (it.type === 'house') return { scale: { x: 1, y: 1, z: 1 }, rotate: 'diag', move: true, lift: true };
-  const T = SIZE_AX[it.type], sw = (it.q || 0) % 2, sc = T ? { x: !!T[sw ? 'z' : 'x'], y: !!T.y, z: !!T[sw ? 'x' : 'z'] } : {};
+  const T = sizeAxes(it.type), sw = (it.q || 0) % 2, sc = T ? { x: !!T[sw ? 'z' : 'x'], y: !!T.y, z: !!T[sw ? 'x' : 'z'] } : {};
   if (it.type === 'struct' || BIG(it.type)) return { scale: sc, rotate: 'quarter', move: true, lift: true };
   if (it.type === 'tree') return { scale: sc, rotate: null, move: true };
   if (T) return { scale: sc, rotate: 'quarter', move: true };
@@ -4216,7 +4242,7 @@ function selVals() {
   if (SEL.kind === 'comp') return { w: +$('g_width').value, d: +$('g_depth').value, f: +$('g_floors').value, fh: +$('g_floor_height').value || 4, q: compRot, rot: +$('g_rotation').value || 0 };
   const it = selItem();
   if (it.type === 'struct') return { q: it.q || 0, rot: 0 };
-  if (SIZE_AX[it.type]) return { q: it.q || 0, rot: 0, gen: true };
+  if (sizeAxes(it.type)) return { q: it.q || 0, rot: 0, gen: true };
   if (it.type === 'house') return { w: it.spec.width, d: it.spec.depth, f: it.spec.floors, fh: it.spec.floor_height || 4, q: it.q || 0, rot: it.spec.rotation || 0 };
   return { h: it.height || 3, size: it.size || 'm', q: it.q || 0, rot: 0 };
 }
@@ -4260,7 +4286,7 @@ function gizMove(e) {
     if (GMODE === 'move' && g.axis === 'y') { const n = Math.round(blocks); g.out = n ? { lift: n } : null; g.label = `高度 ${n >= 0 ? '+' : ''}${n}`; }
     else if (GMODE === 'move') { const n = Math.round(blocks); g.out = { move: g.axis === 'x' ? [n, 0] : [0, n] }; g.label = `${g.axis === 'x' ? 'X' : 'Z'} ${n >= 0 ? '+' : ''}${n}`; }
     else if (v.gen) {
-      const T = SIZE_AX[selType()], lk = g.axis === 'y' ? 'y' : ((g.axis === 'x') !== (v.q % 2 === 1) ? 'x' : 'z'), a = T && T[lk];
+      const T = sizeAxes(selType()), lk = g.axis === 'y' ? 'y' : ((g.axis === 'x') !== (v.q % 2 === 1) ? 'x' : 'z'), a = T && T[lk];
       if (a) { if (g.base === undefined) g.base = axGet(a); const n = Math.round(blocks / (a.per || 1)), nv = axEnum(a) ? axStep(a, g.base, n) : axClamp(a, g.base + n); g.out = nv === g.base ? null : { gen: { [a.f]: nv } }; g.label = `${a.lab} ${axShow(a, nv)}`; }
     }
     else if (g.axis === 'y') {
@@ -4307,7 +4333,7 @@ function gizUp() {
 }
 // ---- undo / redo for selection edits (component house form, district item list)
 function snapshot() {
-  if (curMode() === 'comp' && ctype !== 'house') { const T = SIZE_AX[ctype] || {}; return { kind: 'cprop', t: ctype, v: Object.values(T).map(a => [a.id, $(a.id).value]), rot: propRot[ctype] || 0 }; }
+  if (curMode() === 'comp' && ctype !== 'house') { const T = sizeAxes(ctype) || {}; return { kind: 'cprop', t: ctype, v: Object.values(T).map(a => [a.id, $(a.id).value]), rot: propRot[ctype] || 0 }; }
   if (curMode() === 'comp') return { kind: 'comp', v: ['g_width', 'g_depth', 'g_floors', 'g_rotation'].map(id => $(id).value), compRot };
   if (townActive()) return { kind: 'town', items: JSON.parse(JSON.stringify(TOWN.scene.items)), town: TOWN, suppress: (TOWN.suppress || []).slice() };
   return null;
@@ -5210,7 +5236,11 @@ function renderItemEditor() {
     h += `<p class="spec-note">更多细节（塔顶、屋顶、窗型、玫瑰窗）请在组件模式里调好后“保存为预设”，再从资产库的“地标”里放置。教堂放在台基上：四周整平、高差处砌挡土墙，西门前留 5 格前庭。</p>`;
   } else if (it.type === 'cathedral') {
     const st = Object.entries(MCGen.PROPS.cathedral.styles).map(([k, t]) => `<option value="${k}">${t}</option>`).join('');
+    const extra = extraCathedralItemFields(it, f, sel, num, ck, st);
+    if (extra) h += extra;
+    else {
     h += `<div class="grid">${f('风格', sel('style', st), true)}${f('中殿开间数', num('nave_bays', 3, 14))}${f('中殿宽', num('width', 7, 21))}${f('一楼高', num('arcade_height', 5, 16))}${f('楼廊高', num('gallery_height', 0, 12))}${f('高侧窗层高', num('clerestory_height', 4, 16))}${f('双塔高出立面', num('tower_rise', 8, 60))}${f('东端', sel('east_end', optsOf('c_cd_east_end')))}</div>`;
+    }
     h += `<p class="spec-note">更多细节请在组件模式里调好后“保存为预设”，再从资产库的“地标”里放置。主教座堂放在台基上，西门前留 8 格前庭。</p>`;
   } else h += `<p class="spec-note">导入的结构：${(it.name || '').replace(/</g, '&lt;')}。只能移动、旋转和删除。</p>`;
   h += `<p class="spec-note" id="edst">改动会立刻应用到这栋${TYPE_CN[it.type]}，可以 Ctrl+Z 撤销。</p>`;
@@ -5230,12 +5260,21 @@ function edApply(el) {
   if (!edPushed) { pushHist(); edPushed = true; }      // one undo step per burst of edits
   const k = el.dataset.k, raw = el.type === 'checkbox' ? el.checked : el.value, v = el.type === 'number' ? +raw : /^-?\d+$/.test(raw) && k !== 'style' ? +raw : raw;
   const dst = it.type === 'house' ? it.spec : it;
+  const oldStyle = it.style;
   if (k === 'roof') { const [st, pt] = String(raw).split('|'); dst.roof_style = st; dst.roof_pitch = pt; }
   else dst[k] = v;
+  if (it.type === 'cathedral' && k === 'style' && (['brick_gothic','byzantine'].includes(oldStyle) || ['brick_gothic','byzantine'].includes(v))) {
+    const keepSeed = dst.seed, genKeys = new Set(Object.keys(MCGen.CATHEDRAL_DEFAULT));
+    for (const preset of Object.values(MCGen.CATHEDRAL_PRESETS)) for (const key of Object.keys(preset)) genKeys.add(key);
+    for (const key of genKeys) delete dst[key];
+    Object.assign(dst, v === 'byzantine' ? MCGen.CATHEDRAL_PRESETS.byzantine : { ...MCGen.CATHEDRAL_DEFAULT, ...(MCGen.CATHEDRAL_PRESETS[v] || {}) }, { style: v });
+    if (keepSeed !== undefined) dst.seed = keepSeed;
+    if (v === 'brick_gothic') delete dst.tower_top;
+  }
   it.manual = true;
   $('edst').textContent = '更新中…';
   clearTimeout(edTimer);
-  edTimer = setTimeout(() => { retouch([it.id], `修改了 ${TYPE_CN[it.type]} #${it.id}`, it.id); const e = $('edst'); if (e) e.textContent = '已更新。可以 Ctrl+Z 撤销。'; setTimeout(() => { edPushed = false; }, 800); }, 120);
+  edTimer = setTimeout(() => { if (it.type === 'cathedral' && (['brick_gothic','byzantine'].includes(oldStyle) || ['brick_gothic','byzantine'].includes(it.style))) edFor = null; retouch([it.id], `修改了 ${TYPE_CN[it.type]} #${it.id}`, it.id); const e = $('edst'); if (e) e.textContent = '已更新。可以 Ctrl+Z 撤销。'; setTimeout(() => { edPushed = false; }, 800); }, 120);
 }
 $('itemed').addEventListener('change', e => { if (e.target.dataset.k) edApply(e.target); });
 $('itemed').addEventListener('input', e => { if (e.target.dataset.k && e.target.type === 'number') edApply(e.target); });
@@ -5264,6 +5303,135 @@ for (const id of ['g_floors', 'g_jetty']) {
   document.getElementById(id).addEventListener('change', updateFloorHint);
 }
 updateFloorHint();
+
+// Only the dedicated dome dimensions apply to the experimental Byzantine builder.
+for (const k of ['plan','arch','scale','nave_bays','bay','width','aisles','aisle_width','transept','transept_depth','choir_bays','east_end','chapels','chapel_depth','arcade_height','gallery_height','clerestory_height','facade_extra','tower_rise','fleche_height','portal_orders','flyer_levels','facade','tower_top','east_towers','tower_roof','crossing','roof_style','roof_pitch','flying_buttresses','lombard','louvers','dormers','pinnacles','pinnacle_forest','fleche','rose','kings','statues','campanile','court','interior']) {
+  const id = 'c_cd_' + k, previous = PANEL_DEPS[id];
+  PANEL_DEPS[id] = () => val('c_cd_style') !== 'byzantine' && (!previous || previous());
+}
+const priorCathedralTopDep = PANEL_DEPS.c_cd_tower_top;
+PANEL_DEPS.c_cd_tower_top = () => val('c_cd_style') !== 'brick_gothic' && priorCathedralTopDep();
+PANEL_DEPS.c_cd_brick_tower_top = () => val('c_cd_style') === 'brick_gothic' && val('c_cd_facade') === 'detailed';
+const priorCathedralLouversDep = PANEL_DEPS.c_cd_louvers;
+PANEL_DEPS.c_cd_louvers = () => val('c_cd_style') === 'brick_gothic'
+  ? val('c_cd_facade') === 'detailed' && val('c_cd_brick_tower_top') !== 'none'
+  : priorCathedralLouversDep();
+const brickHasTransept = () => val('c_cd_plan') === 'greek' || val('c_cd_transept');
+for (const [key, test] of Object.entries({
+  crossing: () => brickHasTransept() && val('c_cd_fleche'),
+  fleche: brickHasTransept,
+  fleche_height: () => brickHasTransept() && val('c_cd_fleche') && (['fleche','turret','tower_spire','lantern'].includes(val('c_cd_crossing')) || val('c_cd_facade') === 'simple' && val('c_cd_crossing') !== 'none'),
+  pinnacle_forest: () => val('c_cd_pinnacles') || val('c_cd_east_end') === 'chevet' && +val('c_cd_chapels') > 0,
+  tower_rise: () => !['single','screen'].includes(val('c_cd_facade')),
+  facade_extra: () => !['single','screen'].includes(val('c_cd_facade')),
+  flyer_levels: () => val('c_cd_plan') !== 'hall' && val('c_cd_flying_buttresses') && val('c_cd_facade') !== 'simple',
+})) {
+  const id = 'c_cd_' + key, previous = PANEL_DEPS[id];
+  PANEL_DEPS[id] = () => val('c_cd_style') === 'brick_gothic' ? test() : !previous || previous();
+}
+for (const [key, slot] of [['walls','wall'],['roof','roof'],['glass','glass']]) {
+  const id = 'c_cd_' + key, previous = PANEL_DEPS[id];
+  PANEL_DEPS[id] = () => {
+    if (!['brick_gothic','byzantine'].includes(val('c_cd_style'))) return !previous || previous();
+    const mode = document.querySelector(`.matbox[data-mats="cathedral"] [data-slot="${slot}"] [data-mm]`);
+    return (!mode || mode.value === '') && (!previous || previous());
+  };
+}
+function syncExtraCathedralDeps() {
+  const style = val('c_cd_style'), extra = ['brick_gothic','byzantine'].includes(style), brick = style === 'brick_gothic', byz = style === 'byzantine';
+  const greekOption = $('c_cd_plan').querySelector('[value="greek"]');
+  if (extra) {
+    if (!greekOption.dataset.extraOriginalText) greekOption.dataset.extraOriginalText = greekOption.textContent;
+    greekOption.textContent = '希腊十字（臂长受尺寸约束）';
+  } else if (greekOption.dataset.extraOriginalText) {
+    greekOption.textContent = greekOption.dataset.extraOriginalText; delete greekOption.dataset.extraOriginalText;
+  }
+  const hint = (key, text) => {
+    const lab = labelOf('c_cd_' + key); if (!lab) return;
+    if (text) lab.title = text;
+
+  };
+  const notes = brick ? {
+    plan: val('c_cd_plan') === 'greek' ? '中殿与唱诗堂采用相同开间数；横臂还受侧廊宽度与耳堂进深下限约束，纵横臂可能不等长。' : '',
+    stepped_gables: '新增山墙使用固定红砖、赤陶盲拱和石砖压顶；下方配色控制建筑主体。',
+    scale: '以砖砌默认尺寸为基准套用；1.0 恢复砖砌尺寸，仍受各项范围限制。',
+    tower_rise: '受精细立面的最小高度约束，较小数值可能得到相同塔高；实际塔高见生成报告。',
+    fleche: '勾选时默认使用细尖塔；在“交叉处”选“无”会同时关闭。',
+    crossing: val('c_cd_fleche') ? '' : '先勾选“启用交叉处塔”再选择塔型。',
+    pinnacle_forest: val('c_cd_pinnacles') ? '' : val('c_cd_east_end') === 'chevet' && +val('c_cd_chapels') > 0 ? '小尖塔关闭时，此项只影响放射小礼拜堂高度。' : '需要启用小尖塔，或带放射小礼拜堂的东端。',
+    flyer_levels: '双层需要足够的高侧窗与屋面净空；不足时保留单层，并在生成报告中说明。',
+    dormers: '缓坡或较小屋顶可能放不下；生成报告会说明未生成的原因。',
+  } : {};
+  const flecheLabel = labelOf('c_cd_fleche');
+  if (flecheLabel) {
+    if (brick) { if (!flecheLabel.dataset.extraOriginalLabel) flecheLabel.dataset.extraOriginalLabel = labelName(flecheLabel); setLabelText(flecheLabel, '启用交叉处塔'); }
+    else if (flecheLabel.dataset.extraOriginalLabel) { setLabelText(flecheLabel, flecheLabel.dataset.extraOriginalLabel); delete flecheLabel.dataset.extraOriginalLabel; }
+  }
+  for (const key of ['plan','stepped_gables','scale','tower_rise','fleche','crossing','pinnacle_forest','flyer_levels','dormers']) hint(key, notes[key] || '');
+  for (const key of ['walls','roof','glass']) hint(key, extra && labelOf('c_cd_' + key)?.classList.contains('dis') ? '当前由下方“配色与方块”的自定义设置覆盖；切回“预设”后可调整此项。' : '');
+  for (const el of document.querySelectorAll('.ctype[data-ctype="cathedral"] input[id],.ctype[data-ctype="cathedral"] select[id]')) {
+    const off = extra && el.closest('label')?.classList.contains('dis');
+    if (off && !el.disabled) { el.disabled = true; el.dataset.extraDisabled = '1'; }
+    else if (!off && el.dataset.extraDisabled) { el.disabled = false; delete el.dataset.extraDisabled; }
+  }
+  const box = document.querySelector('.matbox[data-mats="cathedral"]'); if (!box || !box.dataset.ready) return;
+  const ordinaryRose = val('c_cd_rose') && brickHasTransept(), simple = val('c_cd_facade') === 'simple';
+  const inactive = brick ? { accent: !simple && !ordinaryRose && !val('c_cd_interior'), trim: !simple && !ordinaryRose } : {};
+  const names = byz ? { stone: '石作（承重拱、柱与侧廊鼓座）', accent: '墙体横向色带', trim: '穹顶鼓座檐口', floor: '地面（三色加权混合）' } : brick ? { accent: '点缀块（简单立面、普通玫瑰窗、祭坛）', trim: '窗框（简单立面、耳堂普通玫瑰窗）' } : {};
+  for (const row of box.querySelectorAll('.mrow')) {
+    const key = row.dataset.slot, off = !!inactive[key] || byz && key === 'wood', span = row.querySelector(':scope > span');
+    const text = names[key] || MCGen.PROPS.cathedral.matSlots[key].label;
+    if (span) { const node = [...span.childNodes].find(n => n.nodeType === 3 && n.textContent.trim()); if (node) node.textContent = ' ' + text; }
+    row.style.display = byz && key === 'wood' ? 'none' : '';
+    row.style.opacity = off ? '.5' : ''; row.dataset.extraInactive = off ? '1' : '0';
+    for (const el of row.querySelectorAll('input,select')) {
+      if (off && !el.disabled) { el.disabled = true; el.dataset.extraDisabled = '1'; }
+      else if (!off && el.dataset.extraDisabled) { el.disabled = false; delete el.dataset.extraDisabled; }
+    }
+    let note = row.querySelector('.extra-mat-hint');
+    if (off) { if (!note) { note = document.createElement('small'); note.className = 'extra-mat-hint'; row.appendChild(note); } note.textContent = key === 'accent' ? '当前无适用部件；启用内部陈设、普通玫瑰窗或简单立面后可调。' : '当前精细立面使用“石作”配色；简单立面或耳堂普通玫瑰窗可使用此项。'; }
+    else if (note) note.remove();
+  }
+}
+function extraCathedralItemFields(it, f, sel, num, ck, styles) {
+  if (!['brick_gothic','byzantine'].includes(it.style)) return '';
+  let h = '<div class="grid">' + f('风格', sel('style', styles), true);
+  if (it.style === 'byzantine') {
+    h += f('穹顶半径', num('dome_radius', 11, 23)) + f('穹顶高度', num('dome_height', 8, 18)) + f('鼓座高度', num('drum_height', 5, 10)) + f('主体墙高', num('body_height', 18, 30)) + '</div>' + ck('small_domes', '四座侧廊小穹顶');
+  } else {
+    const p = { ...MCGen.CATHEDRAL_DEFAULT, ...MCGen.CATHEDRAL_PRESETS.brick_gothic, ...it };
+    const field = (label, key, min, max, on = true) => f(label, num(key, min, max).replace('>', (key === 'width' ? ' step="2"' : '') + (on ? '>' : ' disabled title="当前平面或立面不使用此项">')));
+    h += f('平面', sel('plan', '<option value="latin">拉丁十字</option><option value="greek">希腊十字（臂长受尺寸约束）</option><option value="hall">厅堂式</option>'));
+    h += field('中殿开间数','nave_bays',3,14,p.plan !== 'greek') + field('唱诗堂开间数','choir_bays',1,10) + field('中殿宽','width',7,21) + field('一楼高','arcade_height',5,16) + field('楼廊高','gallery_height',0,12,p.plan !== 'hall') + field('高侧窗层高','clerestory_height',4,16) + field('双塔高出立面','tower_rise',8,60,!['single','screen'].includes(p.facade));
+    h += f('东端', sel('east_end', optsOf('c_cd_east_end')));
+    if (p.facade === 'detailed') h += f('砖砌塔顶', sel('brick_tower_top', optsOf('c_cd_brick_tower_top')));
+    h += '</div>' + ck('stepped_gables','阶梯山墙与盲拱');
+    if (p.plan === 'greek') h += '<p class="spec-note">中殿与唱诗堂采用相同开间数；横臂长度还受侧廊宽度与耳堂进深下限约束，纵横臂可能不等长。</p>';
+  }
+  h += '<div class="grid">' + f('种子', '<input type="number" data-k="seed">') + '</div>';
+  return h;
+}
+function syncExtraCathedralFields() {
+  const byz = val('c_cd_style') === 'byzantine', brick = val('c_cd_style') === 'brick_gothic';
+  const ids = ['dome_radius','dome_height','drum_height','body_height','small_domes','stepped_gables'];
+  for (const k of ids) { const lab = labelOf('c_cd_' + k); if (lab) { const show = k === 'stepped_gables' ? brick : byz; lab.hidden = !show; lab.style.display = show ? '' : 'none'; } }
+  const group = $('c_cd_dome_radius').closest('details.grp'); if (group) { group.hidden = !byz && !brick; group.style.display = byz || brick ? '' : 'none'; }
+  const oldTop = labelOf('c_cd_tower_top'), brickTop = labelOf('c_cd_brick_tower_top');
+  if (oldTop) { oldTop.hidden = brick; oldTop.style.display = brick ? 'none' : ''; }
+  if (brickTop) { brickTop.hidden = !brick; brickTop.style.display = brick ? '' : 'none'; }
+  $('c_cd_plan').querySelector('[value="central"]').disabled = !byz;
+  const woodRow = document.querySelector('.matbox[data-mats="cathedral"] [data-slot="wood"]'); if (woodRow) woodRow.style.display = byz ? 'none' : '';
+  updateDeps();
+}
+document.addEventListener('change', e => {
+  if (val('c_cd_style') === 'brick_gothic') {
+    if (e.target.id === 'c_cd_fleche' && val('c_cd_fleche') && val('c_cd_crossing') === 'none') $('c_cd_crossing').value = 'fleche';
+    if (e.target.id === 'c_cd_crossing' && val('c_cd_crossing') === 'none') $('c_cd_fleche').checked = false;
+  }
+  if (e.target.id === 'c_cd_style') syncExtraCathedralFields();
+  if ((e.target.id || '').startsWith('c_cd_') && typeof SEL !== 'undefined' && SEL && SEL.kind === 'comp' && ctype === 'cathedral') queueMicrotask(renderSel);
+}, true);
+queueMicrotask(syncExtraCathedralFields);
 </script>
 </body>
 </html>
