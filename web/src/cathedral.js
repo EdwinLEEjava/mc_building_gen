@@ -10,11 +10,13 @@
 // French preset after Notre-Dame de Paris (128 × 48 m, vault 33 m, towers 69 m, flèche 96 m); the defaults are
 // that building at about 0.8 block per metre. Every size can be set on its own.
 // ---------------------------------------------------------------------------------------------
-const CATHEDRAL_STYLES = { french: '法式（兰斯 / 巴黎圣母院）', german: '德式（科隆）', italian: '意式（米兰）', spanish: '西班牙（塞维利亚）', english: '英式（索尔兹伯里 / 林肯）', romanesque: '罗马式（施派尔 / 沃尔姆斯）' };
-const CATHEDRAL_PLANS = { latin: '拉丁十字', greek: '希腊十字（四臂等长）', hall: '厅堂式（侧廊与中殿等高，一整片屋顶）' };
+const CATHEDRAL_STYLES = { french: '法式（兰斯 / 巴黎圣母院）', german: '德式（科隆）', italian: '意式（米兰）', spanish: '西班牙（塞维利亚）', english: '英式（索尔兹伯里 / 林肯）', romanesque: '罗马式（施派尔 / 沃尔姆斯）', brick_gothic: '砖砌哥特式（吕贝克 / 汉萨）', byzantine: '拜占庭式（中央穹顶）' };
+const CATHEDRAL_PLANS = { central: '集中式穹顶平面', latin: '拉丁十字', greek: '希腊十字（四臂等长）', hall: '厅堂式（侧廊与中殿等高，一整片屋顶）' };
 const CATHEDRAL_ARCHES = { pointed: '尖拱（哥特）', round: '圆拱（罗马式）' };
 // a style = a set of starting values; every value can still be changed afterwards (the panel copies them in when the style changes)
 const CATHEDRAL_PRESETS = {
+  brick_gothic: { arch: 'pointed', plan: 'latin', brick_tower_top: 'solid', walls: 'brick', roof: 'slate', facade: 'detailed', tower_top: 'flat', east_towers: 'none', crossing: 'none', fleche: false, roof_style: 'pitched', campanile: false, court: false, pinnacle_forest: false, pinnacles: false, flying_buttresses: true, flyer_levels: 1, rose: false, kings: false, statues: false, portal_orders: 3, nave_bays: 8, bay: 7, width: 15, aisles: 2, aisle_width: 6, transept: true, transept_depth: 4, choir_bays: 3, east_end: 'flat', chapels: 0, arcade_height: 10, gallery_height: 4, clerestory_height: 10, facade_extra: 2, tower_rise: 14, roof_pitch: 'normal', louvers: true, dormers: false, stepped_gables: true },
+  byzantine: { arch: 'round', plan: 'central', walls: 'sandstone', roof: 'copper', glass: 'amber', dome_radius: 17, dome_height: 12, drum_height: 7, body_height: 23, small_domes: true, seed: 1 },
   french: { pinnacle_forest: false, facade: 'detailed', tower_top: 'flat', crossing: 'fleche', roof_style: 'pitched', campanile: false, court: false },
   german: { pinnacle_forest: true, flyer_levels: 2, rose: false, kings: false, roof: 'stone', facade: 'detailed', tower_top: 'openwork', crossing: 'turret', roof_style: 'pitched', campanile: false, court: false, nave_bays: 10, width: 15, aisle_width: 6, arcade_height: 15, gallery_height: 4, clerestory_height: 15, transept_depth: 4, chapels: 7, roof_pitch: 'steep', walls: 'warm', fleche_height: 30 },
   italian: { pinnacle_forest: true, facade: 'screen', tower_top: 'none', crossing: 'lantern', roof_style: 'pitched', campanile: false, court: false, nave_bays: 9, width: 19, aisle_width: 6, arcade_height: 16, gallery_height: 0, clerestory_height: 8, transept_depth: 4, east_end: 'apse', roof_pitch: 'normal', walls: 'marble', roof: 'stone', fleche_height: 30 },
@@ -50,7 +52,7 @@ const CATHEDRAL_RANGES = {
 };
 function cathedral(o = {}) {   // every arch (doors, windows, belfries) follows the style's arch shape while it builds
   const arch = { ...CATHEDRAL_DEFAULT, ...(CATHEDRAL_PRESETS[o.style] || {}), ...o }.arch;
-  return gothicWithArch(arch, () => _cathedral(o));
+  return gothicWithArch(arch, () => o.style === 'brick_gothic' ? brickGothicCathedral(o) : o.style === 'byzantine' ? byzantineCathedral(o) : _cathedral(o));
 }
 function _cathedral(o) {
   const p = { ...CATHEDRAL_DEFAULT, ...(CATHEDRAL_PRESETS[o.style] || {}), ...o };
