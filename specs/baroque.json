@@ -1,0 +1,11 @@
+{
+  "type": "cathedral",
+  "style": "baroque",
+  "seed": 1,
+  "nave_width": 41,
+  "body_height": 34,
+  "extra_bays": 0,
+  "interior": true,
+  "roof": "copper",
+  "walls": "sandstone"
+}

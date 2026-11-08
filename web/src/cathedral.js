@@ -51,6 +51,8 @@ const CATHEDRAL_RANGES = {
   portal_orders: [1, 6], flyer_levels: [1, 2], arcade_height: [5, 16], gallery_height: [0, 12], clerestory_height: [4, 16], facade_extra: [1, 12], tower_rise: [8, 60], fleche_height: [10, 90],
 };
 function cathedral(o = {}) {   // every arch (doors, windows, belfries) follows the style's arch shape while it builds
+  if (o.style === 'renaissance') return renaissanceCathedral(o);
+  if (o.style === 'baroque') return baroqueCathedral(o);
   const arch = { ...CATHEDRAL_DEFAULT, ...(CATHEDRAL_PRESETS[o.style] || {}), ...o }.arch;
   return gothicWithArch(arch, () => o.style === 'brick_gothic' ? brickGothicCathedral(o) : o.style === 'byzantine' ? byzantineCathedral(o) : _cathedral(o));
 }
