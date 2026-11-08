@@ -12,6 +12,9 @@ from mcgen.proportions import solve
 
 
 def generate(spec, out, raw=False):
+    if spec.get("style") == "baroque":
+        from mcgen.baroque import generate_baroque
+        return generate_baroque(spec, out)
     report = []
     if not raw:
         spec, report, _ = solve(spec)

@@ -430,12 +430,12 @@ function composeTown(scene) {
 // their own blocks change; returns the rectangle of columns that changed, for the viewer.
 function retouchTown(state, scene, ids) {
   const st = state, T = st.T, touched = [];
-  for (const id of ids) touched.push(...unplace(st, id));
+  for (const id of ids) for (const key of unplace(st, id)) touched.push(key); // large landmarks exceed argument limits
   const warn = [], clashes = [], newPlaced = [];
   for (const id of ids) {
     const it = scene.items.find(i => i.id === id); if (!it) continue;
     noteResult(st, it, placeJournaled(st, it), warn, clashes);
-    const J = st.J.get(id); if (J) { touched.push(...J.b.keys()); newPlaced.push(...J.pl); for (const i of J.h.keys()) touched.push(key3(T.x0 + Math.floor(i / T.L), 0, T.z0 + i % T.L)); }
+    const J = st.J.get(id); if (J) { for (const key of J.b.keys()) touched.push(key); for (const key of J.pl) newPlaced.push(key); for (const i of J.h.keys()) touched.push(key3(T.x0 + Math.floor(i / T.L), 0, T.z0 + i % T.L)); }
   }
   let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, maxY = -Infinity;
   for (const k of touched) { const [x, y, z] = unkey(k); if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; if (y > maxY) maxY = y; }

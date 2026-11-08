@@ -1,7 +1,9 @@
 import json, glob, itertools, random
 specs = []
 for f in sorted(glob.glob('specs/*.json')):
-    specs.append(json.load(open(f)))
+    spec = json.load(open(f))
+    if spec.get('type', 'house') == 'house':
+        specs.append(spec)
 R = random.Random(5)
 plans = ['auto', 'rect', 'L', 'T', 'H', 'cross', 'cross_long', 'longhouse']
 styles = ['gable', 'gambrel', 'mansard', 'curved', 'saltbox', 'mono', 'clerestory', 'm_shaped', 'butterfly', 'elven', 'temple', 'magical']

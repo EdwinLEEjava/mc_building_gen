@@ -128,6 +128,7 @@ if __name__ == "__main__":
     from mcgen.colors import export_for_viewer
     t = t.replace("/*RECOLOR*/null", json.dumps(export_for_viewer(), ensure_ascii=False, separators=(",", ":")))
     t = t.replace("/*MCGEN_JS*/", gen_js())
+    t = t.replace("/*CATHEDRAL_STYLE_CONTROLS*/", open("viewer/cathedral-style-controls.js", encoding="utf-8").read())
     t = t.replace("/*GEN*/null", json.dumps(gen_bundle(), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/"))
     open(out, "w", encoding="utf-8").write(t)
     for it in items:
