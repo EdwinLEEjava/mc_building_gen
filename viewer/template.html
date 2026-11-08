@@ -110,8 +110,6 @@ canvas:active { cursor: grabbing; }
 .glayer input[type=text] { background: transparent; border: 0; color: var(--text); font: 12.5px var(--font-body); width: 100%; }
 .gen .ck { display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--text); }
 .gen .ck input { accent-color: var(--accent); }
-.gen label.ck.extra-cd-note { flex-wrap: wrap; grid-column: 1 / -1; }
-.gen label.ck.extra-cd-note > small { flex: 0 0 100%; }
 .gen .seedrow { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
 .gen details { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
 .gen summary { cursor: pointer; font-size: 12.5px; color: var(--text); }
@@ -540,7 +538,7 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
     <div class="sec gen ctype" data-ctype="cathedral" hidden>
       <span class="sec-title">地标 · 主教座堂</span>
       <div class="grid">
-        <label class="f">风格<select id="c_cd_style"><option value="french" selected>法式（兰斯 / 巴黎圣母院）</option><option value="german">德式（科隆）</option><option value="italian">意式（米兰）</option><option value="spanish">西班牙（塞维利亚）</option><option value="english">英式（索尔兹伯里 / 林肯）</option><option value="romanesque">罗马式（施派尔 / 沃尔姆斯）</option><option value="brick_gothic">砖砌哥特式（吕贝克 / 汉萨）· 试作</option><option value="byzantine">拜占庭式（中央穹顶）· 试作</option></select></label>
+        <label class="f">风格<select id="c_cd_style"><option value="french" selected>法式（兰斯 / 巴黎圣母院）</option><option value="german">德式（科隆）</option><option value="italian">意式（米兰）</option><option value="spanish">西班牙（塞维利亚）</option><option value="english">英式（索尔兹伯里 / 林肯）</option><option value="romanesque">罗马式（施派尔 / 沃尔姆斯）</option><option value="brick_gothic">砖砌哥特式</option><option value="byzantine">拜占庭式</option></select></label>
         <label class="f">拱形<select id="c_cd_arch"><option value="pointed" selected>尖拱（哥特）</option><option value="round">圆拱（罗马式）</option></select></label>
         <label class="f">西立面<select id="c_cd_facade"><option value="detailed" selected>精细双塔立面</option><option value="single">单塔立面（西面堡 / 乌尔姆）</option><option value="screen">屏风立面（无塔）</option><option value="simple">简单（旧版平立面）</option></select></label>
         <label class="f">塔顶<select id="c_cd_tower_top"><option value="flat" selected>平顶 + 尖塔群（兰斯）</option><option value="openwork">镂空尖塔（科隆）</option><option value="none">无塔</option></select></label>
@@ -5350,11 +5348,8 @@ function syncExtraCathedralDeps() {
   }
   const hint = (key, text) => {
     const lab = labelOf('c_cd_' + key); if (!lab) return;
-    if (lab.classList.contains('ck')) lab.classList.toggle('extra-cd-note', !!text);
-    let note = lab.querySelector('.extra-cd-hint');
-    if (!text) { if (note) note.remove(); return; }
-    if (!note) { note = document.createElement('small'); note.className = 'extra-cd-hint'; note.style.cssText = 'display:block;font-size:11px;line-height:1.5;color:var(--muted)'; lab.appendChild(note); }
-    note.textContent = text;
+    if (text) lab.title = text;
+
   };
   const notes = brick ? {
     plan: val('c_cd_plan') === 'greek' ? '中殿与唱诗堂采用相同开间数；横臂还受侧廊宽度与耳堂进深下限约束，纵横臂可能不等长。' : '',
@@ -5412,7 +5407,6 @@ function extraCathedralItemFields(it, f, sel, num, ck, styles) {
     if (p.facade === 'detailed') h += f('砖砌塔顶', sel('brick_tower_top', optsOf('c_cd_brick_tower_top')));
     h += '</div>' + ck('stepped_gables','阶梯山墙与盲拱');
     if (p.plan === 'greek') h += '<p class="spec-note">中殿与唱诗堂采用相同开间数；横臂长度还受侧廊宽度与耳堂进深下限约束，纵横臂可能不等长。</p>';
-    if (it.brick_tower_top === undefined && it.tower_top !== undefined) h += '<p class="spec-note">保留此旧工程原有塔顶；主动更换“砖砌塔顶”后使用新版选项。</p>';
   }
   h += '<div class="grid">' + f('种子', '<input type="number" data-k="seed">') + '</div>';
   return h;

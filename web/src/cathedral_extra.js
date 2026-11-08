@@ -133,7 +133,7 @@ function byzantineCathedral(o) {
   const hx = R + 3, hz = R + 9, end = R + 2, capR = R + 2, low = Math.round(H * 0.64);
   const materialReport = [], slots = Object.fromEntries(Object.entries(CHURCH_MAT_SLOTS).filter(([key]) => key !== 'wood'));
   const MS = resolveMats(slots, p.mats, materialReport);
-  if (p.mats && p.mats.wood) materialReport.push('木作配色当前未使用：拜占庭试作没有木作部件。');
+  if (p.mats && p.mats.wood) materialReport.push('木作配色当前未使用：拜占庭式没有木作部件。');
   // A dome needs full blocks only. Uncut oxidized copper also has a correct
   // average-colour definition in the current offline viewer.
   const roof = MS.roof ? MS.roof.block : p.roof === 'copper' ? 'oxidized_copper' : (CHURCH_ROOFS[p.roof] || CHURCH_ROOFS.copper).block;
@@ -255,7 +255,7 @@ function byzantineCathedral(o) {
   fixConnections(S); stairShapes(S); S.box = null;
   const [[x0, , z0], [x1, y1, z1]] = S.bounds();
   report.push(`拜占庭式：中央穹顶直径 ${R * 2 + 1} 格、高 ${DH} 格；鼓座 ${DR} 格；东西半穹顶；${p.small_domes !== false ? '四座侧廊小穹顶；' : ''}砖石横向色带、圆拱窗与粗大承重墩。`);
-  report.push(`尺寸 ${x1 - x0 + 1}×${y1 + 2}×${z1 - z0 + 1}；简化的穹顶教堂试作，并非历史建筑复刻。`);
+  report.push(`尺寸 ${x1 - x0 + 1}×${y1 + 2}×${z1 - z0 + 1}。`);
   report.push(...materialReport);
   return { S, spec: { ...p, style: 'byzantine', plan: 'central', arch: 'round', dome_radius: R, dome_height: DH, drum_height: DR, body_height: H }, report, adjust, foot: [x0, x1, z0, z1], tags: ['landmark', 'cathedral'] };
 }

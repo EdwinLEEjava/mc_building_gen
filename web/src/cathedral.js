@@ -10,7 +10,7 @@
 // French preset after Notre-Dame de Paris (128 × 48 m, vault 33 m, towers 69 m, flèche 96 m); the defaults are
 // that building at about 0.8 block per metre. Every size can be set on its own.
 // ---------------------------------------------------------------------------------------------
-const CATHEDRAL_STYLES = { french: '法式（兰斯 / 巴黎圣母院）', german: '德式（科隆）', italian: '意式（米兰）', spanish: '西班牙（塞维利亚）', english: '英式（索尔兹伯里 / 林肯）', romanesque: '罗马式（施派尔 / 沃尔姆斯）', brick_gothic: '砖砌哥特式（吕贝克 / 汉萨）', byzantine: '拜占庭式（中央穹顶）' };
+const CATHEDRAL_STYLES = { french: '法式（兰斯 / 巴黎圣母院）', german: '德式（科隆）', italian: '意式（米兰）', spanish: '西班牙（塞维利亚）', english: '英式（索尔兹伯里 / 林肯）', romanesque: '罗马式（施派尔 / 沃尔姆斯）', brick_gothic: '砖砌哥特式', byzantine: '拜占庭式' };
 const CATHEDRAL_PLANS = { central: '集中式穹顶平面', latin: '拉丁十字', greek: '希腊十字（四臂等长）', hall: '厅堂式（侧廊与中殿等高，一整片屋顶）' };
 const CATHEDRAL_ARCHES = { pointed: '尖拱（哥特）', round: '圆拱（罗马式）' };
 // a style = a set of starting values; every value can still be changed afterwards (the panel copies them in when the style changes)
